@@ -5,7 +5,6 @@ import {
   aplicarCondicao,
   aplicarDelta,
   apagarFicha,
-  ativarHabilidade,
   atribuirHabilidade,
   carregarEnergia,
   corrigirRecurso,
@@ -18,9 +17,11 @@ import {
   salvarNarrativa,
   usarConsumivel,
 } from "@/lib/actions/ficha"
+import { ajustarTemporarios, atribuirMarca } from "@/lib/actions/marcas"
+import { CartaHabilidade } from "@/components/habilidade-carta"
 import { FichaEditor } from "@/components/ficha-editor"
 import { Aviso, Enviar, Medidor } from "@/components/ui"
-import { exigirMesa, quando } from "@/lib/mesa"
+import { exigirMesa, quando, relacao } from "@/lib/mesa"
 import {
   ATRIBUTOS,
   PERICIAS,
@@ -77,13 +78,37 @@ export async function FichaTela({ id, erro }: { id?: string; erro?: string }) {
     mesa.supabase.from("item_log").select("*").eq("character_id", ficha.id).order("created_at", { ascending: false }).limit(30),
   ])
   const todasHabilidades = mesa.isMaster ? (await mesa.supabase.from("abilities").select("*").order("name")).data : []
+  const { data: marcas } = mesa.isMaster
+    ? await mesa.supabase.from("marks").select("id, name, seal_name").eq("active", true).order("sort_order")
+    : { data: [] }
+  const { data: marca } = ficha.mark_id
+    ? await mesa.supabase.from("marks").select("*").eq("id", ficha.mark_id).maybeSingle()
+    : { data: null }
+  const { data: daMarca } = ficha.mark_id
+    ? await mesa.supabase.from("abilities").select("*").eq("mark_id", ficha.mark_id).order("sort_order")
+    : { data: [] }
+  const { data: efeitos } = await mesa.supabase.from("ability_effects").select("id, summary, turns_left").eq("character_id", ficha.id).is("ended_at", null)
+  const { data: combate } = await mesa.supabase.from("combats").select("id").eq("status", "em_andamento").maybeSingle()
+  const { data: combatentes } = combate
+    ? await mesa.supabase.from("combatants").select("character_id, display_name").eq("combat_id", combate.id)
+    : { data: [] }
+  const { data: fichasAlvo } = mesa.isMaster
+    ? await mesa.supabase.from("characters").select("id, name").order("name")
+    : { data: [] }
+  const alvos = mesa.isMaster
+    ? (fichasAlvo ?? []).map((item) => ({ id: item.id as string, name: item.name || "Sem nome" }))
+    : [
+        { id: ficha.id as string, name: ficha.name || "Você" },
+        ...(combatentes ?? []).filter((item) => item.character_id !== ficha.id).map((item) => ({ id: item.character_id as string, name: item.display_name as string })),
+      ]
+  const personalizadas = (todasHabilidades ?? []).filter((item) => !item.mark_id)
 
   return (
     <section className="stack">
       <header className="page-head">
         <p className="kicker">Personagem</p>
         <h1>{ficha.name || "Sem nome"}</h1>
-        <p className="lede"><span className="tag on">{STATUS[ficha.sheet_status] ?? ficha.sheet_status}</span> {ficha.nickname}</p>
+        <p className="lede"><span className="tag on">{STATUS[ficha.sheet_status] ?? ficha.sheet_status}</span> {ficha.nickname}{ficha.player_id ? "" : " · NPC"}</p>
       </header>
       <Aviso erro={erro} />
       {pendencias.length ? <p className="panel">Pendências: {pendencias.join(" · ")}</p> : <p className="panel">A ficha mecânica está pronta.</p>}
@@ -92,6 +117,8 @@ export async function FichaTela({ id, erro }: { id?: string; erro?: string }) {
         <article className="panel stat"><span className="muted">PV</span><Medidor atual={ficha.pv_current} maximo={ficha.pv_max || pvMaximo(ficha.vigor)} /></article>
         <article className="panel stat"><span className="muted">Espírito</span><Medidor atual={ficha.spirit_current} maximo={ficha.spirit_max || espiritoMaximo(ficha.espirito)} espirito /></article>
         <article className="panel stat"><span className="muted">Deslocamento</span><b>{deslocamento(ficha.agilidade)} m</b></article>
+        {ficha.pv_temporary > 0 ? <article className="panel stat"><span className="muted">Vida temporária</span><b>{ficha.pv_temporary}</b></article> : null}
+        {ficha.essence_stored > 0 || marca?.slug === "devoracao" ? <article className="panel stat"><span className="muted">Essência</span><b>{ficha.essence_stored}</b></article> : null}
       </div>
 
       {editaMecanica && !travado ? <FichaEditor ficha={ficha} mestre={mesa.isMaster} /> : (
@@ -243,40 +270,75 @@ export async function FichaTela({ id, erro }: { id?: string; erro?: string }) {
       </section>
 
       <section className="panel stack">
+        <h2>Marca</h2>
+        {marca ? (
+          <>
+            <p className="kicker">{marca.seal_name}</p>
+            <h3>{marca.name}</h3>
+            <p>{marca.description}</p>
+            <p className="muted">Especialidade: {marca.specialty}</p>
+          </>
+        ) : <p className="muted">Nenhuma Marca atribuída.</p>}
+        {mesa.isMaster ? (
+          <form action={atribuirMarca} className="row">
+            <input type="hidden" name="character_id" value={ficha.id} />
+            <input type="hidden" name="destino" value={destino} />
+            <label><span>Atribuir</span>
+              <select name="mark_id" defaultValue={ficha.mark_id ?? ""}>
+                <option value="">Sem Marca</option>
+                {(marcas ?? []).map((item) => <option key={item.id} value={item.id}>{item.name} — {item.seal_name}</option>)}
+              </select>
+            </label>
+            <Enviar>Salvar Marca</Enviar>
+          </form>
+        ) : null}
+        {(efeitos ?? []).length ? (
+          <ul>{(efeitos ?? []).map((item) => <li key={item.id}>{item.summary} · {item.turns_left ?? "—"} turno(s)</li>)}</ul>
+        ) : null}
+        {mesa.isMaster ? (
+          <form action={ajustarTemporarios} className="grid-2">
+            <input type="hidden" name="character_id" value={ficha.id} />
+            <input type="hidden" name="destino" value={destino} />
+            <label><span>Vida temporária</span><input name="pv_temporary" type="number" min={0} defaultValue={ficha.pv_temporary} /></label>
+            <label><span>Essência absorvida</span><input name="essence_stored" type="number" min={0} defaultValue={ficha.essence_stored} /></label>
+            <Enviar>Ajustar</Enviar>
+          </form>
+        ) : null}
+      </section>
+
+      <section className="panel stack">
         <h2>Habilidades</h2>
-        {(habilidades ?? []).map((liga) => (
-          <article key={liga.id}>
-            <strong>{liga.abilities?.name}</strong> <span className="tag">{liga.abilities?.kind}</span>
-            <p>{liga.abilities?.description}</p>
-            <p className="muted">{liga.abilities?.effect} · Custo {liga.abilities?.spirit_cost} · {liga.abilities?.requirements_text}</p>
-            {liga.abilities?.kind === "ativavel" && !travado ? (
-              <form action={ativarHabilidade}>
-                <input type="hidden" name="link_id" value={liga.id} />
-                <input type="hidden" name="destino" value={destino} />
-                <button className="btn" type="submit">Ativar</button>
-              </form>
-            ) : null}
-            {mesa.isMaster ? (
-              <form action={removerHabilidade}>
-                <input type="hidden" name="id" value={liga.id} />
-                <input type="hidden" name="destino" value={destino} />
-                <button className="btn danger" type="submit">Remover da ficha</button>
-              </form>
-            ) : null}
-          </article>
+        {(daMarca ?? []).map((item) => (
+          <CartaHabilidade key={item.id} habilidade={item} characterId={ficha.id} destino={destino} travado={travado} alvos={alvos} />
         ))}
+        {(habilidades ?? []).map((liga) => {
+          const habilidade = relacao(liga.abilities)
+          if (!habilidade) return null
+          return (
+            <div key={liga.id}>
+              <CartaHabilidade habilidade={habilidade} characterId={ficha.id} destino={destino} travado={travado} alvos={alvos} />
+              {mesa.isMaster ? (
+                <form action={removerHabilidade}>
+                  <input type="hidden" name="id" value={liga.id} />
+                  <input type="hidden" name="destino" value={destino} />
+                  <button className="btn danger" type="submit">Remover da ficha</button>
+                </form>
+              ) : null}
+            </div>
+          )
+        })}
         {mesa.isMaster ? (
           <form action={atribuirHabilidade} className="row">
             <input type="hidden" name="character_id" value={ficha.id} />
             <input type="hidden" name="destino" value={destino} />
             <select name="ability_id" required>
-              <option value="">Atribuir habilidade</option>
-              {(todasHabilidades ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              <option value="">Atribuir habilidade de NPC</option>
+              {personalizadas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
             <Enviar>Atribuir</Enviar>
           </form>
         ) : null}
-        <p className="muted">O cadastro de habilidades novas fica em Configurações. Requisitos numéricos são conferidos; o texto é o lembrete do mestre.</p>
+        <p className="muted">As sete habilidades da Marca acompanham a Marca. Habilidades avulsas são para NPCs e continuam cadastradas em Configurações.</p>
       </section>
 
       <section className="panel stack">
