@@ -18,7 +18,7 @@ import {
   usarConsumivel,
 } from "@/lib/actions/ficha"
 import { ajustarTemporarios, atribuirMarca } from "@/lib/actions/marcas"
-import { CartaHabilidade } from "@/components/habilidade-carta"
+import { CartaHabilidade, FormaAlvosArea } from "@/components/habilidade-carta"
 import { FichaEditor } from "@/components/ficha-editor"
 import { Aviso, Enviar, Medidor } from "@/components/ui"
 import { exigirMesa, quando, relacao } from "@/lib/mesa"
@@ -87,20 +87,25 @@ export async function FichaTela({ id, erro }: { id?: string; erro?: string }) {
   const { data: daMarca } = ficha.mark_id
     ? await mesa.supabase.from("abilities").select("*").eq("mark_id", ficha.mark_id).order("sort_order")
     : { data: [] }
-  const { data: efeitos } = await mesa.supabase.from("ability_effects").select("id, summary, turns_left").eq("character_id", ficha.id).is("ended_at", null)
-  const { data: combate } = await mesa.supabase.from("combats").select("id").eq("status", "em_andamento").maybeSingle()
-  const { data: combatentes } = combate
-    ? await mesa.supabase.from("combatants").select("character_id, display_name").eq("combat_id", combate.id)
+  const { data: efeitos } = await mesa.supabase
+    .from("ability_effects")
+    .select("id, summary, turns_left, clock_character_id")
+    .or(`source_character_id.eq.${ficha.id},target_character_id.eq.${ficha.id},character_id.eq.${ficha.id}`)
+    .is("ended_at", null)
+  const { data: alvosRpc } = await mesa.supabase.rpc("alvos_de_habilidade", { p_character_id: ficha.id })
+  const alvos = (alvosRpc ?? []).map((item: { id: string; name: string }) => ({ id: item.id, name: item.name || "Sem nome" }))
+  const { data: cadaveresRpc } = marca?.slug === "devoracao"
+    ? await mesa.supabase.rpc("cadaveres_absorviveis", { p_character_id: ficha.id })
     : { data: [] }
-  const { data: fichasAlvo } = mesa.isMaster
-    ? await mesa.supabase.from("characters").select("id, name").order("name")
+  const cadaveres = (cadaveresRpc ?? []).map((item: { id: string; name: string }) => ({ id: item.id, name: item.name || "Sem nome" }))
+  const { data: usosBrutos } = mesa.isMaster
+    ? await mesa.supabase.from("ability_uses").select("id, note, ability_id, abilities(name, target_count)").eq("character_id", ficha.id).order("created_at", { ascending: false }).limit(8)
     : { data: [] }
-  const alvos = mesa.isMaster
-    ? (fichasAlvo ?? []).map((item) => ({ id: item.id as string, name: item.name || "Sem nome" }))
-    : [
-        { id: ficha.id as string, name: ficha.name || "Você" },
-        ...(combatentes ?? []).filter((item) => item.character_id !== ficha.id).map((item) => ({ id: item.character_id as string, name: item.display_name as string })),
-      ]
+  const usosArea = (usosBrutos ?? []).flatMap((uso) => {
+    const habilidade = relacao(uso.abilities) as { name?: string; target_count?: string } | null
+    if (habilidade?.target_count !== "varios") return []
+    return [{ id: uso.id as string, name: habilidade.name || "Habilidade", note: uso.note as string }]
+  })
   const personalizadas = (todasHabilidades ?? []).filter((item) => !item.mark_id)
 
   return (
@@ -293,7 +298,9 @@ export async function FichaTela({ id, erro }: { id?: string; erro?: string }) {
           </form>
         ) : null}
         {(efeitos ?? []).length ? (
-          <ul>{(efeitos ?? []).map((item) => <li key={item.id}>{item.summary} · {item.turns_left ?? "—"} turno(s)</li>)}</ul>
+          <ul>{(efeitos ?? []).map((item) => (
+            <li key={item.id}>{item.summary} · {item.turns_left ?? "—"} turno(s) · {item.clock_character_id === ficha.id ? "desconta no turno desta ficha" : "desconta no turno de quem recebeu"}</li>
+          ))}</ul>
         ) : null}
         {mesa.isMaster ? (
           <form action={ajustarTemporarios} className="grid-2">
@@ -309,14 +316,14 @@ export async function FichaTela({ id, erro }: { id?: string; erro?: string }) {
       <section className="panel stack">
         <h2>Habilidades</h2>
         {(daMarca ?? []).map((item) => (
-          <CartaHabilidade key={item.id} habilidade={item} characterId={ficha.id} destino={destino} travado={travado} alvos={alvos} />
+          <CartaHabilidade key={item.id} habilidade={item} characterId={ficha.id} destino={destino} travado={travado} alvos={alvos} cadaveres={cadaveres} />
         ))}
         {(habilidades ?? []).map((liga) => {
           const habilidade = relacao(liga.abilities)
           if (!habilidade) return null
           return (
             <div key={liga.id}>
-              <CartaHabilidade habilidade={habilidade} characterId={ficha.id} destino={destino} travado={travado} alvos={alvos} />
+              <CartaHabilidade habilidade={habilidade} characterId={ficha.id} destino={destino} travado={travado} alvos={alvos} cadaveres={cadaveres} />
               {mesa.isMaster ? (
                 <form action={removerHabilidade}>
                   <input type="hidden" name="id" value={liga.id} />
@@ -340,6 +347,7 @@ export async function FichaTela({ id, erro }: { id?: string; erro?: string }) {
         ) : null}
         <p className="muted">As sete habilidades da Marca acompanham a Marca. Habilidades avulsas são para NPCs e continuam cadastradas em Configurações.</p>
       </section>
+      {mesa.isMaster ? <FormaAlvosArea usos={usosArea} fichas={alvos} destino={destino} /> : null}
 
       <section className="panel stack">
         <h2>Condições</h2>

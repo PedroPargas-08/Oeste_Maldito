@@ -252,6 +252,9 @@ export async function criarHabilidade(formData: FormData) {
     damage_spirit: vazioNumero(formData.get("damage_spirit")),
     heal_pv: vazioNumero(formData.get("heal_pv")),
     heal_spirit: vazioNumero(formData.get("heal_spirit")),
+    target_count: ["nenhum", "proprio", "um", "varios"].includes(String(formData.get("target_count") ?? ""))
+      ? String(formData.get("target_count"))
+      : kind === "passiva" ? "nenhum" : "um",
   })
   if (error) falhar(destino, textoErro(error)!)
   concluir(destino)

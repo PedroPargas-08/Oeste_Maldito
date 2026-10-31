@@ -1,4 +1,5 @@
-import { registrarAbsorcao, usarHabilidade } from "@/lib/actions/marcas"
+import { registrarAbsorcao, registrarAlvos, usarHabilidade } from "@/lib/actions/marcas"
+import { avisosDeHabilidade } from "@/lib/marks"
 import { Enviar } from "@/components/ui"
 
 export type HabilidadeVista = {
@@ -16,12 +17,15 @@ export type HabilidadeVista = {
   range_label?: string | null
   range_m?: number | null
   duration_text?: string | null
+  duration_turns?: number | null
   damage_pv?: number | null
   damage_spirit?: number | null
   heal_pv?: number | null
   heal_spirit?: number | null
   spend_all_spirit?: boolean | null
   once_per?: string | null
+  target_count?: string | null
+  requires_essence?: boolean | null
 }
 
 const TIPOS: Record<string, string> = {
@@ -36,19 +40,27 @@ export function CartaHabilidade({
   destino,
   travado,
   alvos,
+  cadaveres = [],
 }: {
   habilidade: HabilidadeVista
   characterId: string
   destino: string
   travado: boolean
   alvos: { id: string; name: string }[]
+  cadaveres?: { id: string; name: string }[]
 }) {
   const custo = habilidade.spend_all_spirit
     ? `todo o Espírito, mínimo ${habilidade.spirit_cost}`
     : `${habilidade.spirit_cost ?? 0} Espírito`
-  const precisaAlvo = (habilidade.damage_pv ?? 0) > 0 || (habilidade.damage_spirit ?? 0) > 0
-  const precisaDistancia = habilidade.range_m != null
+  const modo = habilidade.target_count ?? "um"
   const banquete = habilidade.slug === "banquete-de-almas"
+  const pedeAlvo = modo === "um" && (
+    (habilidade.damage_pv ?? 0) > 0
+    || (habilidade.damage_spirit ?? 0) > 0
+    || (habilidade.duration_turns ?? 0) > 0
+  )
+  const avisos = avisosDeHabilidade(habilidade)
+  const rotulo = modo === "varios" ? "Registrar ativação" : (habilidade.damage_pv || habilidade.damage_spirit || habilidade.heal_pv || habilidade.heal_spirit) ? "Usar" : "Registrar uso"
 
   return (
     <article className="fold">
@@ -73,29 +85,44 @@ export function CartaHabilidade({
       {habilidade.target_text ? <p className="muted">Alvo: {habilidade.target_text}</p> : null}
       {habilidade.requirements_text ? <p className="muted">Requisitos: {habilidade.requirements_text}</p> : null}
       {habilidade.limitations ? <p className="muted">Limitações: {habilidade.limitations}</p> : null}
+      {avisos.map((aviso) => <p key={aviso} className="muted">{aviso}</p>)}
       {banquete && !travado ? (
-        <div className="row">
-          <form action={registrarAbsorcao}>
-            <input type="hidden" name="character_id" value={characterId} />
-            <input type="hidden" name="destino" value={destino} />
-            <input type="hidden" name="choice" value="pv" />
-            <button className="btn" type="submit">Absorver 50 PV</button>
-          </form>
-          <form action={registrarAbsorcao}>
-            <input type="hidden" name="character_id" value={characterId} />
-            <input type="hidden" name="destino" value={destino} />
-            <input type="hidden" name="choice" value="espirito" />
-            <button className="btn" type="submit">Absorver 20 Espírito</button>
-          </form>
-        </div>
+        cadaveres.length ? (
+          <div className="stack">
+            <form action={registrarAbsorcao} className="row">
+              <input type="hidden" name="character_id" value={characterId} />
+              <input type="hidden" name="destino" value={destino} />
+              <input type="hidden" name="choice" value="pv" />
+              <label><span>Criatura morta</span>
+                <select name="source_id" required>
+                  <option value="">Escolher</option>
+                  {cadaveres.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </label>
+              <button className="btn" type="submit">Absorver 50 PV</button>
+            </form>
+            <form action={registrarAbsorcao} className="row">
+              <input type="hidden" name="character_id" value={characterId} />
+              <input type="hidden" name="destino" value={destino} />
+              <input type="hidden" name="choice" value="espirito" />
+              <label><span>Criatura morta</span>
+                <select name="source_id" required>
+                  <option value="">Escolher</option>
+                  {cadaveres.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </label>
+              <button className="btn" type="submit">Absorver 20 Espírito</button>
+            </form>
+          </div>
+        ) : <p className="muted">Nenhum NPC com PV 0 está disponível para absorção.</p>
       ) : null}
       {habilidade.kind !== "passiva" && !travado ? (
         <form action={usarHabilidade} className="grid-2">
           <input type="hidden" name="character_id" value={characterId} />
           <input type="hidden" name="ability_id" value={habilidade.id} />
           <input type="hidden" name="destino" value={destino} />
-          {precisaDistancia ? <label><span>Distância em metros</span><input name="distance" type="number" min={0} required /></label> : null}
-          {precisaAlvo ? (
+          {habilidade.range_m != null ? <label><span>Distância declarada, em metros</span><input name="distance" type="number" min={0} /></label> : null}
+          {pedeAlvo ? (
             <label><span>Alvo</span>
               <select name="target_id" required>
                 <option value="">Escolher</option>
@@ -103,9 +130,38 @@ export function CartaHabilidade({
               </select>
             </label>
           ) : null}
-          <Enviar>Usar</Enviar>
+          <Enviar>{rotulo}</Enviar>
         </form>
       ) : null}
     </article>
+  )
+}
+
+export function FormaAlvosArea({
+  usos,
+  fichas,
+  destino,
+}: {
+  usos: { id: string; name: string; note: string }[]
+  fichas: { id: string; name: string }[]
+  destino: string
+}) {
+  if (!usos.length) return null
+  return (
+    <section className="panel stack">
+      <h2>Alvos de habilidades em área</h2>
+      <p className="muted">O custo já foi cobrado. Marcar uma ficha aplica o dano numérico uma vez. Repetir a mesma ficha não soma de novo.</p>
+      {usos.map((uso) => (
+        <form key={uso.id} action={registrarAlvos} className="stack">
+          <input type="hidden" name="use_id" value={uso.id} />
+          <input type="hidden" name="destino" value={destino} />
+          <p><strong>{uso.name}</strong><br /><span className="muted">{uso.note}</span></p>
+          {fichas.map((ficha) => (
+            <label key={ficha.id} className="check"><input type="checkbox" name="target_id" value={ficha.id} /> {ficha.name}</label>
+          ))}
+          <Enviar>Aplicar nestes alvos</Enviar>
+        </form>
+      ))}
+    </section>
   )
 }
