@@ -62,6 +62,8 @@ export async function encerrarCombate(formData: FormData) {
     .update({ status: "encerrado", ended_at: new Date().toISOString(), summary: String(formData.get("summary") ?? "") })
     .eq("id", id)
   if (error) falhar("/combate", textoErro(error)!)
+  const { error: erroEfeito } = await mesa.supabase.rpc("encerrar_efeitos")
+  if (erroEfeito) falhar("/combate", textoErro(erroEfeito)!)
   await mesa.supabase.from("combat_events").insert({
     combat_id: id,
     actor_id: mesa.userId,
@@ -77,6 +79,10 @@ export async function avancarTurno(formData: FormData) {
   const { data: combate } = await mesa.supabase.from("combats").select("active_character_id").eq("id", combatId).single()
   if (!lista?.length || !combate) falhar("/combate", "Combate não encontrado.")
   const indice = Math.max(0, lista.findIndex((item) => item.character_id === combate.active_character_id))
+  if (combate.active_character_id) {
+    const { error: erroEfeito } = await mesa.supabase.rpc("encerrar_turno", { p_character_id: combate.active_character_id })
+    if (erroEfeito) falhar("/combate", textoErro(erroEfeito)!)
+  }
   const proximo = lista[(indice + 1) % lista.length]!
   const { error } = await mesa.supabase.from("combats").update({ active_character_id: proximo.character_id }).eq("id", combatId)
   if (error) falhar("/combate", textoErro(error)!)

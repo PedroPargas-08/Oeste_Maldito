@@ -14,14 +14,16 @@ export default async function Page() {
   if (!mesa.isMaster) {
     const { data: ficha } = await mesa.supabase.from("characters").select("*").eq("player_id", mesa.userId).maybeSingle()
     if (!ficha) return <section className="page-head"><h1>Painel</h1><p><a href="/ficha">Criar ficha</a></p></section>
-    const [{ data: armas }, { data: habilidades }, { data: condicoes }] = await Promise.all([
+    const [{ data: armas }, { data: habilidades }, { data: daMarca }, { data: condicoes }, { data: marca }] = await Promise.all([
       mesa.supabase.from("inventory").select("equipped, ammo, quantity, item_definitions(name, category)").eq("character_id", ficha.id).eq("equipped", true),
       mesa.supabase.from("character_abilities").select("abilities(name)").eq("character_id", ficha.id),
+      ficha.mark_id ? mesa.supabase.from("abilities").select("name").eq("mark_id", ficha.mark_id).order("sort_order") : Promise.resolve({ data: [] }),
       mesa.supabase.from("character_conditions").select("duration_label, conditions(name, effect)").eq("character_id", ficha.id),
+      ficha.mark_id ? mesa.supabase.from("marks").select("name, seal_name").eq("id", ficha.mark_id).maybeSingle() : Promise.resolve({ data: null }),
     ])
     return (
       <section className="stack">
-        <header className="page-head"><p className="kicker">Consulta</p><h1>{ficha.name || "Sua ficha"}</h1></header>
+        <header className="page-head"><p className="kicker">{marca?.name ?? "Consulta"}</p><h1>{ficha.name || "Sua ficha"}</h1>{marca ? <p className="lede">{marca.seal_name}</p> : null}</header>
         <div className="grid-2">
           <article className="panel"><h2>PV</h2><Medidor atual={ficha.pv_current} maximo={ficha.pv_max} /></article>
           <article className="panel"><h2>Espírito</h2><Medidor atual={ficha.spirit_current} maximo={ficha.spirit_max} espirito /></article>
@@ -36,7 +38,10 @@ export default async function Page() {
           <h2>Equipado</h2>
           <ul>{(armas ?? []).map((item) => <li key={relacao(item.item_definitions)?.name}>{relacao(item.item_definitions)?.name} · munição {item.ammo ?? "—"}</li>)}</ul>
           <h2>Habilidades</h2>
-          <ul>{(habilidades ?? []).map((item) => <li key={relacao(item.abilities)?.name}>{relacao(item.abilities)?.name}</li>)}</ul>
+          <ul>
+            {(daMarca ?? []).map((item) => <li key={item.name}>{item.name}</li>)}
+            {(habilidades ?? []).map((item) => <li key={relacao(item.abilities)?.name}>{relacao(item.abilities)?.name}</li>)}
+          </ul>
           <h2>Condições</h2>
           <ul>{(condicoes ?? []).map((item) => <li key={relacao(item.conditions)?.name}>{relacao(item.conditions)?.name}: {relacao(item.conditions)?.effect} · {item.duration_label}</li>)}</ul>
         </article>

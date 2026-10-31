@@ -5,6 +5,8 @@ import { supabaseConfigurado } from "@/lib/env"
 import { assinar, exigirMesa } from "@/lib/mesa"
 import { lerTema } from "@/lib/theme"
 
+export const dynamic = "force-dynamic"
+
 export default async function MesaLayout({ children }: { children: React.ReactNode }) {
   if (!supabaseConfigurado()) redirect("/")
   const mesa = await exigirMesa()
@@ -12,7 +14,7 @@ export default async function MesaLayout({ children }: { children: React.ReactNo
   const caminho = (await headers()).get("x-pathname") ?? ""
   const livre = caminho.startsWith("/aguardando") || caminho.startsWith("/ficha")
   if (!mesa.approved && !livre) redirect("/aguardando")
-  if (!mesa.isMaster && (caminho.startsWith("/auditoria") || caminho.startsWith("/configuracoes"))) redirect("/painel")
+  if (!mesa.isMaster && (caminho.startsWith("/auditoria") || caminho.startsWith("/configuracoes") || caminho.startsWith("/marcas"))) redirect("/painel")
   if (!mesa.isMaster && caminho.startsWith("/encerramento") && !mesa.adventure.closing_published) redirect("/lobby")
 
   const logoUrl = await assinar("marca", mesa.adventure.logo_path)
