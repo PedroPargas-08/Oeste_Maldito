@@ -1,0 +1,122 @@
+export const ENCICLOPEDIA = [
+  {
+    key: "criacao",
+    titulo: "Criação",
+    blocos: [
+      "Os seis atributos começam em 1. O jogador distribui 24 pontos adicionais, no máximo 10 em cada atributo.",
+      "As doze perícias começam em 0. O jogador distribui 15 pontos, no máximo 3 em cada perícia na criação. Cada ponto soma +1 no teste pertinente.",
+      "Não há XP, níveis nem evolução numérica de atributos e perícias durante a one-shot. Mudança posterior depende do mestre.",
+      "A ficha tem duas áreas: a mecânica e o perfil narrativo. O jogador edita o perfil com liberdade. Atributos e perícias, depois da aprovação, só mudam com o mestre.",
+    ],
+  },
+  {
+    key: "atributos",
+    titulo: "Atributos e perícias",
+    blocos: [
+      "Mira: precisão com armas de disparo, pontaria e tiros em movimento.",
+      "Vigor: saúde, força e resistência. Determina o PV máximo.",
+      "Agilidade: reflexos, movimento, furtividade, destreza e cavalgar.",
+      "Astúcia: percepção, investigação, rastreamento e medicina de campo.",
+      "Carisma: persuasão, intimidação, negociação, blefe e liderança.",
+      "Espírito: resistência a horrores e maldições, e canalização de energia mística.",
+      "Atletismo (Vigor), Briga (Vigor), Sobrevivência (Astúcia), Atirar (Mira), Cavalgar (Agilidade), Investigar (Astúcia), Percepção (Astúcia), Medicina (Astúcia), Furtividade (Agilidade), Persuadir (Carisma), Intimidar (Carisma), Ocultismo (Espírito).",
+    ],
+  },
+  {
+    key: "testes",
+    titulo: "Testes",
+    blocos: [
+      "Teste padrão: 1d20 + atributo + no máximo uma perícia pertinente. O resultado precisa ser igual ou superior à CD.",
+      "Sem perícia adequada, o teste usa só o atributo. O mestre escolhe atributo, perícia e CD.",
+      "Fora dos casos definidos em combate, a aplicação de resultados naturais fica a critério do mestre.",
+    ],
+    tabela: {
+      legenda: "CD de referência. Não é uma escala definitiva.",
+      linhas: ["Muito fácil 8", "Fácil 11", "Moderada 14", "Difícil 17", "Muito difícil 20", "Extrema 23", "Quase impossível 26"],
+    },
+  },
+  {
+    key: "recursos",
+    titulo: "PV e Espírito",
+    blocos: [
+      "Todos os humanos usam a mesma escala. PV máximo = 300 + (Vigor − 1) × 300/9, arredondado ao inteiro mais próximo.",
+      "Espírito máximo = 200 + (Espírito − 1) × 200/9, arredondado ao inteiro mais próximo.",
+      "Ao mudar Vigor ou Espírito, o máximo é recalculado. O valor atual não é substituído em silêncio.",
+      "Uma ação carregada com energia sobrenatural custa 10 Espírito. Qualquer personagem com Espírito suficiente pode carregar ataque ou disparo; não precisa de Marca.",
+      "Ataques comuns não causam dano real a criaturas sobrenaturais. Ataques carregados causam. O custo 10 é o genérico; o mestre pode configurar outra cifra numa habilidade.",
+      "Equipamento especial não gasta Espírito só por ser especial.",
+      "Perda de PV não gera penalidade numérica automática. Não existe sanidade numérica: consequência psicológica é narrativa.",
+    ],
+  },
+  {
+    key: "descansos",
+    titulo: "Descansos e tratamento",
+    blocos: [
+      "A recuperação incide sobre o PV máximo, pode acumular e não ultrapassa o máximo.",
+      "Descanso curto: 20% do PV máximo. Descanso longo: 60%. Tratamento médico bem-sucedido: 80%.",
+      "Sem Medicina, o tratamento é um teste de Astúcia. Com Medicina, Astúcia + Medicina. Sucesso recupera 80% do PV máximo.",
+      "Consequência de falha e a frequência dos tratamentos ficam a critério do mestre.",
+      "Espírito só volta em descanso. Curto e longo restauram a reserva inteira. Tratamento médico não recupera Espírito.",
+      "A Marca da Devoração é exceção de recuperação e fica no compêndio, não nesta mesa como regra fixa.",
+    ],
+  },
+  {
+    key: "combate",
+    titulo: "Combate e iniciativa",
+    blocos: [
+      "Iniciativa: 1d20 + Agilidade. O maior age primeiro. Empate de iniciativa não tem desempate automático: o mestre ordena.",
+      "Fora do site, o mapa usa quadrados de 1 m × 1 m. O site não tem mapa tático.",
+      "Deslocamento por turno: 5 + Agilidade metros. Um movimento e uma ação principal por turno.",
+      "20 natural em combate concede uma ação extra. Os exemplos definidos são movimento adicional ou segundo disparo. 20 natural não multiplica nem dá bônus especial de dano corpo a corpo.",
+      "Outros usos do 20 natural ficam a critério do mestre.",
+      "Desarmado e arma branca: 1d20 + Vigor + Briga. Se o alvo percebe o ataque, há disputa com a defesa. Empate: 1d20 puro, sem atributo nem perícia, até haver vencedor.",
+      "Agarrões, imobilizações, derrubadas, desarmes e outras situações especiais são narrativos.",
+      "Alvo que não percebe o ataque a tempo: o golpe é garantido, sem defesa e sem redução.",
+      "Dano desarmado: Vigor + 1d20. Lâmina: Vigor + 2d20, somando os dados.",
+      "Cobertura é narrativa. Ataque errado, retirada do corpo a corpo e desvantagem numérica não geram penalidade automática.",
+    ],
+  },
+  {
+    key: "esquiva",
+    titulo: "Defesa e esquiva",
+    blocos: [
+      "Defesa: 1d20 + Vigor. A disputa decide se o golpe vence. O resultado da defesa decide a redução, mesmo se a defesa perder a disputa.",
+      "Redução: 1–9 = 0%, 10 = 10%, e daí +10% por ponto até 17 = 80%. 18 ou mais = 90%. 20 natural na defesa = 100%, no lugar da tabela.",
+      "A referência 10 é o começo dessa tabela, não uma CD separada.",
+      "Esquiva humana, quando o mestre pede: 1 falha crítica e recebe dois ataques; 2–14 recebe o golpe integral; 15–19 desvia; 20 desvia e ganha turno extra para contra-atacar.",
+      "A esquiva humana não recebe modificador de Agilidade. Esquiva contra tiro é decisão narrativa do mestre, não é automática.",
+    ],
+  },
+  {
+    key: "armas",
+    titulo: "Armas e munição",
+    blocos: [
+      "Não há tabela universal de armas. O mestre cadastra dano, alcance, munição e propriedades.",
+      "Arma de fogo causa o dano fixo da ficha, sem rolagem extra de dano. Alcance efetivo = alcance da arma + Mira.",
+      "CD do disparo = distância em metros entre atirador e alvo. Teste: 1d6 + Mira + Atirar. Abaixo da CD, erra.",
+      "Variação do dano conforme a distância é narrativa. Perfuração, explosão e alvos múltiplos são individuais, sem tabela universal.",
+      "O disparo desconta munição. Sem quantidade suficiente, o disparo não acontece.",
+    ],
+  },
+  {
+    key: "inventario",
+    titulo: "Equipamentos e inventário",
+    blocos: [
+      "O jogador organiza o próprio inventário e escolhe o que está equipado, desde que possua o item.",
+      "O mestre adiciona, remove e edita itens, quantidades e propriedades.",
+      "Troca de equipamento durante a sessão é livre se o item estiver na ficha, e fica registrada.",
+      "Medicamento e tônico são descontados ao usar. Não existe loja nem catálogo de compras: o dinheiro é lançado direto na ficha.",
+    ],
+  },
+  {
+    key: "habilidades",
+    titulo: "Habilidades e Marcas",
+    blocos: [
+      "Aqui só existe a estrutura genérica. Os poderes das Marcas ficam no compêndio e são configurados pelo mestre, sem efeito gravado no motor.",
+      "Cada habilidade tem nome, descrição, tipo, efeito, requisitos, custo e limitações. Pode ser passiva ou ativável.",
+      "Antes de ativar, a mesa confere requisitos numéricos e recursos, desconta o custo e registra o uso.",
+      "O custo sobrenatural genérico é 10 Espírito, salvo o valor que o mestre gravar naquela habilidade.",
+      "Condições vêm de uma lista pré-cadastrada. O mestre aplica, edita a duração e remove. Nada expira sozinho. Não há penalidade universal: o efeito é o texto daquela condição.",
+    ],
+  },
+] as const
