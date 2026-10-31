@@ -7,7 +7,8 @@ import {
   limparCarga,
   moverOrdem,
 } from "@/lib/actions/combate"
-import { carregarEnergia, ativarHabilidade, usarConsumivel } from "@/lib/actions/ficha"
+import { carregarEnergia, usarConsumivel } from "@/lib/actions/ficha"
+import { CartaHabilidade } from "@/components/habilidade-carta"
 import { Dados } from "@/components/dados"
 import { Aviso, Enviar } from "@/components/ui"
 import { exigirMesa, quando, relacao } from "@/lib/mesa"
@@ -30,16 +31,20 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
     ? await mesa.supabase.from("inventory").select("id, character_id, item_definitions!inner(name, category)").eq("item_definitions.category", "arma_fogo")
     : { data: [] }
   const { data: historico } = await mesa.supabase.from("combats").select("id, started_at, ended_at, summary, status").order("started_at", { ascending: false }).limit(8)
-  const minha = !mesa.isMaster
-    ? (await mesa.supabase.from("characters").select("id, name").eq("player_id", mesa.userId).maybeSingle()).data
+  const eu = !mesa.isMaster
+    ? (await mesa.supabase.from("characters").select("id, name, mark_id").eq("player_id", mesa.userId).maybeSingle()).data
     : null
-  const habilidades = minha
-    ? (await mesa.supabase.from("character_abilities").select("id, abilities(name, kind)").eq("character_id", minha.id)).data
+  const habilidades = eu
+    ? (await mesa.supabase.from("character_abilities").select("id, abilities(*)").eq("character_id", eu.id)).data
     : []
-  const consumiveis = minha
-    ? (await mesa.supabase.from("inventory").select("id, quantity, item_definitions!inner(name, category)").eq("character_id", minha.id).eq("item_definitions.category", "consumivel")).data
+  const daMarca = eu?.mark_id
+    ? (await mesa.supabase.from("abilities").select("*").eq("mark_id", eu.mark_id).order("sort_order")).data
     : []
-  const meuTurno = Boolean(minha && combate?.active_character_id === minha.id)
+  const consumiveis = eu
+    ? (await mesa.supabase.from("inventory").select("id, quantity, item_definitions!inner(name, category)").eq("character_id", eu.id).eq("item_definitions.category", "consumivel")).data
+    : []
+  const meuTurno = Boolean(eu && combate?.active_character_id === eu.id)
+  const alvos = (combatentes ?? []).map((item) => ({ id: item.character_id as string, name: item.display_name as string }))
 
   const armas = (armasBrutas ?? []).map((item) => ({
     id: item.id as string,
@@ -90,16 +95,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
               <form action={anotarCombate} className="row"><input type="hidden" name="combat_id" value={combate.id} /><input name="body" required placeholder="Acontecimento" /><Enviar>Anotar</Enviar></form>
             </div>
           ) : null}
-          {meuTurno && minha ? (
-            <div className="row">
-              <form action={carregarEnergia}><input type="hidden" name="character_id" value={minha.id} /><input type="hidden" name="destino" value="/combate" /><button className="btn" type="submit">Carregar ação</button></form>
-              {(habilidades ?? []).filter((item) => relacao(item.abilities)?.kind === "ativavel").map((item) => (
-                <form key={item.id} action={ativarHabilidade}>
-                  <input type="hidden" name="link_id" value={item.id} />
-                  <input type="hidden" name="destino" value="/combate" />
-                  <button className="btn" type="submit">{relacao(item.abilities)?.name}</button>
-                </form>
+          {meuTurno && eu ? (
+            <div className="stack">
+              <form action={carregarEnergia}><input type="hidden" name="character_id" value={eu.id} /><input type="hidden" name="destino" value="/combate" /><button className="btn" type="submit">Carregar ação</button></form>
+              {(daMarca ?? []).filter((item) => item.kind !== "passiva").map((item) => (
+                <CartaHabilidade key={item.id} habilidade={item} characterId={eu.id} destino="/combate" travado={false} alvos={alvos} />
               ))}
+              {(habilidades ?? []).map((item) => {
+                const habilidade = relacao(item.abilities)
+                if (!habilidade || habilidade.kind === "passiva") return null
+                return <CartaHabilidade key={item.id} habilidade={habilidade} characterId={eu.id} destino="/combate" travado={false} alvos={alvos} />
+              })}
               {(consumiveis ?? []).map((item) => (
                 <form key={item.id} action={usarConsumivel}>
                   <input type="hidden" name="inventory_id" value={item.id} />

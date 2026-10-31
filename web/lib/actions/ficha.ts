@@ -232,6 +232,7 @@ export async function criarHabilidade(formData: FormData) {
     if (bruto) requires[item.key] = Number(bruto)
   }
   const kind = String(formData.get("kind") ?? "ativavel")
+  const spirit = kind === "passiva" ? 0 : Number(formData.get("spirit_cost") ?? 10)
   const { error } = await mesa.supabase.from("abilities").insert({
     name: String(formData.get("name") ?? "").trim(),
     description: String(formData.get("description") ?? ""),
@@ -239,8 +240,18 @@ export async function criarHabilidade(formData: FormData) {
     effect: String(formData.get("effect") ?? ""),
     requirements_text: String(formData.get("requirements_text") ?? ""),
     requires,
-    spirit_cost: Number(formData.get("spirit_cost") ?? (kind === "ativavel" ? 10 : 0)),
+    spirit_cost: spirit,
     limitations: String(formData.get("limitations") ?? ""),
+    target_text: String(formData.get("target_text") ?? ""),
+    area_text: String(formData.get("area_text") ?? ""),
+    range_label: String(formData.get("range_label") ?? ""),
+    range_m: vazioNumero(formData.get("range_m")),
+    duration_text: String(formData.get("duration_text") ?? ""),
+    duration_turns: vazioNumero(formData.get("duration_turns")),
+    damage_pv: vazioNumero(formData.get("damage_pv")),
+    damage_spirit: vazioNumero(formData.get("damage_spirit")),
+    heal_pv: vazioNumero(formData.get("heal_pv")),
+    heal_spirit: vazioNumero(formData.get("heal_spirit")),
   })
   if (error) falhar(destino, textoErro(error)!)
   concluir(destino)

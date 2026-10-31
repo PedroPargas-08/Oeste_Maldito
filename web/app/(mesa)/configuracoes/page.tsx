@@ -70,8 +70,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
         <input type="hidden" name="destino" value="/configuracoes" />
         <div className="grid-2">
           <label><span>Nome</span><input name="name" required /></label>
-          <label><span>Tipo</span><select name="kind"><option value="ativavel">Ativável</option><option value="passiva">Passiva</option></select></label>
+          <label><span>Tipo</span><select name="kind"><option value="ativavel">Ativável</option><option value="combate">Combate</option><option value="passiva">Passiva</option></select></label>
           <label><span>Custo de Espírito</span><input name="spirit_cost" type="number" min={0} defaultValue={10} /></label>
+          <label><span>Dano em PV</span><input name="damage_pv" type="number" min={0} /></label>
+          <label><span>Dano em Espírito</span><input name="damage_spirit" type="number" min={0} /></label>
+          <label><span>Alcance em metros</span><input name="range_m" type="number" min={0} /></label>
+          <label><span>Área</span><input name="area_text" /></label>
+          <label><span>Duração</span><input name="duration_text" /></label>
         </div>
         <label><span>Descrição</span><textarea name="description" /></label>
         <label><span>Efeito</span><textarea name="effect" /></label>
@@ -83,6 +88,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
           ))}
         </div>
         <Enviar>Cadastrar habilidade</Enviar>
+        <p className="muted">As Marcas oficiais e o balanceamento das trinta e cinco habilidades ficam em Marcas. Este formulário cria habilidade avulsa de NPC.</p>
       </form>
       <form action={criarCondicao} className="panel stack">
         <h2>Condição pré-cadastrada</h2>

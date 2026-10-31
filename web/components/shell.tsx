@@ -63,6 +63,7 @@ export function Shell({
           ) : null}
           {isMaster ? (
             <>
+              <Link href="/marcas" className={caminho.startsWith("/marcas") ? "active" : ""}>Marcas</Link>
               <Link href="/auditoria" className={caminho.startsWith("/auditoria") ? "active" : ""}>Auditoria</Link>
               <Link href="/configuracoes" className={caminho.startsWith("/configuracoes") ? "active" : ""}>Configurações</Link>
             </>
