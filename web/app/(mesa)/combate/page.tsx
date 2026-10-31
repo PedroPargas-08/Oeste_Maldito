@@ -11,6 +11,7 @@ import { carregarEnergia, usarConsumivel } from "@/lib/actions/ficha"
 import { CartaHabilidade, FormaAlvosArea } from "@/components/habilidade-carta"
 import { Dados } from "@/components/dados"
 import { Aviso, Enviar } from "@/components/ui"
+import { montarUsosArea } from "@/lib/marks"
 import { exigirMesa, quando, relacao } from "@/lib/mesa"
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ erro?: string }> }) {
@@ -52,13 +53,25 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
     ? await mesa.supabase.from("ability_effects").select("id, summary, turns_left").is("ended_at", null)
     : { data: [] }
   const { data: usosBrutos } = mesa.isMaster
-    ? await mesa.supabase.from("ability_uses").select("id, note, abilities(name, target_count)").order("created_at", { ascending: false }).limit(8)
+    ? await mesa.supabase.from("ability_uses").select("id, note, abilities(name, target_count, max_targets)").order("created_at", { ascending: false }).limit(8)
     : { data: [] }
-  const usosArea = (usosBrutos ?? []).flatMap((uso) => {
-    const habilidade = relacao(uso.abilities) as { name?: string; target_count?: string } | null
-    if (habilidade?.target_count !== "varios") return []
-    return [{ id: uso.id as string, name: habilidade.name || "Habilidade", note: uso.note as string }]
-  })
+  const idsDeUso = (usosBrutos ?? []).map((uso) => uso.id as string)
+  const { data: alvosRegistrados } = mesa.isMaster && idsDeUso.length
+    ? await mesa.supabase.from("ability_use_targets").select("ability_use_id").in("ability_use_id", idsDeUso)
+    : { data: [] }
+  const usosArea = montarUsosArea(
+    (usosBrutos ?? []).map((uso) => {
+      const habilidade = relacao(uso.abilities) as { name?: string; target_count?: string; max_targets?: number | null } | null
+      return {
+        id: uso.id as string,
+        note: uso.note as string,
+        name: habilidade?.name || "Habilidade",
+        targetCount: habilidade?.target_count,
+        maxTargets: habilidade?.max_targets,
+      }
+    }),
+    alvosRegistrados ?? [],
+  )
 
   const armas = (armasBrutas ?? []).map((item) => ({
     id: item.id as string,

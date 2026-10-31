@@ -77,6 +77,12 @@ begin
   if (select name from public.abilities where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee') <> 'Truque antigo' then
     raise exception 'Habilidade antiga não voltou.';
   end if;
+  if (select max_targets from public.abilities where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee') is not null then
+    raise exception 'Habilidade antiga ganhou limite de alvos.';
+  end if;
+  if (select max_targets from public.abilities where slug = 'ricochete-guiado') <> 3 then
+    raise exception 'Backup antigo apagou o limite do Ricochete.';
+  end if;
   if (select count(*) from public.essence_absorptions) <> 0 then
     raise exception 'Backup antigo criou absorção.';
   end if;
@@ -113,5 +119,11 @@ begin
   end if;
   if (select count(*) from public.marks) <> 5 or (select count(*) from public.abilities where mark_id is not null) <> 35 then
     raise exception 'Catálogo mudou na restauração.';
+  end if;
+  if (select max_targets from public.abilities where slug = 'ricochete-guiado') <> 3 then
+    raise exception 'Backup novo perdeu o limite do Ricochete.';
+  end if;
+  if (select max_targets from public.abilities where slug = 'chuva-de-chumbo-espectral') is not null then
+    raise exception 'Backup novo inventou limite para a Chuva.';
   end if;
 end $$;

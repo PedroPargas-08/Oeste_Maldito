@@ -20,6 +20,13 @@ function inteiroOpcional(valor: FormDataEntryValue | null) {
   return Number(texto)
 }
 
+function maximoAlvos(valor: FormDataEntryValue | null) {
+  const texto = String(valor ?? "").trim()
+  if (!texto) return null
+  if (!/^\d+$/.test(texto) || Number(texto) < 1) return Number.NaN
+  return Number(texto)
+}
+
 export async function atribuirMarca(formData: FormData) {
   const mesa = await exigirMesa()
   const destino = destinoDe(formData, "/ficha")
@@ -96,6 +103,8 @@ export async function editarHabilidade(formData: FormData) {
   const mesa = await exigirMesa()
   const destino = destinoDe(formData, "/marcas")
   if (!mesa.isMaster) falhar(destino, "Somente o mestre edita habilidades.")
+  const maximo = maximoAlvos(formData.get("max_targets"))
+  if (Number.isNaN(maximo)) falhar(destino, "O máximo de alvos, quando existe, é um inteiro a partir de 1.")
   const { error } = await mesa.supabase
     .from("abilities")
     .update({
@@ -105,6 +114,7 @@ export async function editarHabilidade(formData: FormData) {
       limitations: String(formData.get("limitations") ?? ""),
       spirit_cost: Number(formData.get("spirit_cost") ?? 0),
       target_count: modoAlvo(formData.get("target_count")),
+      max_targets: maximo,
       target_text: String(formData.get("target_text") ?? ""),
       area_text: String(formData.get("area_text") ?? ""),
       range_label: String(formData.get("range_label") ?? ""),

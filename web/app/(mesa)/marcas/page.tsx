@@ -39,7 +39,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
             <p className="muted">Portadores: {portadores.map((item) => item.name || "Sem nome").join(", ") || "ninguém"}</p>
             {lista.map((habilidade) => (
               <details key={habilidade.id} className="fold">
-                <summary>{habilidade.name} · {habilidade.kind} · {habilidade.spend_all_spirit ? `todo o Espírito, mínimo ${habilidade.spirit_cost}` : `${habilidade.spirit_cost} Espírito`}</summary>
+                <summary>{habilidade.name} · {habilidade.kind} · {habilidade.spend_all_spirit ? `todo o Espírito, mínimo ${habilidade.spirit_cost}` : `${habilidade.spirit_cost} Espírito`}{habilidade.target_count === "varios" ? (habilidade.max_targets ? ` · até ${habilidade.max_targets} alvos` : " · quantidade de alvos não definida") : ""}</summary>
                 <form action={editarHabilidade} className="stack">
                   <input type="hidden" name="id" value={habilidade.id} />
                   <input type="hidden" name="destino" value="/marcas" />
@@ -55,6 +55,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
                         <option value="varios">Vários alvos, resolvidos pelo mestre</option>
                       </select>
                     </label>
+                    <label><span>Máximo de alvos</span><input name="max_targets" type="number" min={1} defaultValue={habilidade.max_targets ?? ""} /></label>
                     <label><span>Alcance em metros</span><input name="range_m" type="number" min={0} defaultValue={habilidade.range_m ?? ""} /></label>
                     <label><span>Rótulo do alcance</span><input name="range_label" defaultValue={habilidade.range_label} /></label>
                     <label><span>Área</span><input name="area_text" defaultValue={habilidade.area_text} /></label>
@@ -108,6 +109,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
               <option value="varios">Vários alvos, resolvidos pelo mestre</option>
             </select>
           </label>
+          <label><span>Máximo de alvos</span><input name="max_targets" type="number" min={1} placeholder="Vazio se a regra não definir" /></label>
           <label><span>Dano em PV</span><input name="damage_pv" type="number" min={0} /></label>
           <label><span>Dano em Espírito</span><input name="damage_spirit" type="number" min={0} /></label>
           <label><span>Alcance em metros</span><input name="range_m" type="number" min={0} /></label>

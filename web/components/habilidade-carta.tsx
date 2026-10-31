@@ -1,5 +1,5 @@
 import { registrarAbsorcao, registrarAlvos, usarHabilidade } from "@/lib/actions/marcas"
-import { avisosDeHabilidade } from "@/lib/marks"
+import { avisosDeHabilidade, vagasDeAlvo } from "@/lib/marks"
 import { Enviar } from "@/components/ui"
 
 export type HabilidadeVista = {
@@ -25,6 +25,7 @@ export type HabilidadeVista = {
   spend_all_spirit?: boolean | null
   once_per?: string | null
   target_count?: string | null
+  max_targets?: number | null
   requires_essence?: boolean | null
 }
 
@@ -142,7 +143,7 @@ export function FormaAlvosArea({
   fichas,
   destino,
 }: {
-  usos: { id: string; name: string; note: string }[]
+  usos: { id: string; name: string; note: string; maxTargets: number | null; registrados: number }[]
   fichas: { id: string; name: string }[]
   destino: string
 }) {
@@ -151,17 +152,40 @@ export function FormaAlvosArea({
     <section className="panel stack">
       <h2>Alvos de habilidades em área</h2>
       <p className="muted">O custo já foi cobrado. Marcar uma ficha aplica o dano numérico uma vez. Repetir a mesma ficha não soma de novo.</p>
-      {usos.map((uso) => (
-        <form key={uso.id} action={registrarAlvos} className="stack">
-          <input type="hidden" name="use_id" value={uso.id} />
-          <input type="hidden" name="destino" value={destino} />
-          <p><strong>{uso.name}</strong><br /><span className="muted">{uso.note}</span></p>
-          {fichas.map((ficha) => (
-            <label key={ficha.id} className="check"><input type="checkbox" name="target_id" value={ficha.id} /> {ficha.name}</label>
-          ))}
-          <Enviar>Aplicar nestes alvos</Enviar>
-        </form>
-      ))}
+      {usos.map((uso) => {
+        const vagas = vagasDeAlvo(uso.registrados, uso.maxTargets)
+        return (
+          <form key={uso.id} action={registrarAlvos} className="stack">
+            <input type="hidden" name="use_id" value={uso.id} />
+            <input type="hidden" name="destino" value={destino} />
+            <p><strong>{uso.name}</strong><br /><span className="muted">{uso.note}</span></p>
+            {uso.maxTargets == null ? (
+              <>
+                <p className="muted">A quantidade máxima de alvos não está definida. O registro segue sem teto numérico.</p>
+                {fichas.map((ficha) => (
+                  <label key={ficha.id} className="check"><input type="checkbox" name="target_id" value={ficha.id} /> {ficha.name}</label>
+                ))}
+                <Enviar>Aplicar nestes alvos</Enviar>
+              </>
+            ) : vagas === 0 ? (
+              <p className="muted">Esta ativação já tem {uso.registrados} alvo(s), o máximo de {uso.maxTargets}. Os registros permanecem.</p>
+            ) : (
+              <>
+                <p className="muted">No máximo {uso.maxTargets} alvos.{uso.registrados > 0 ? ` ${uso.registrados} já registrado(s).` : ""} Ainda {vagas === 1 ? "cabe 1" : `cabem ${vagas}`}.</p>
+                {Array.from({ length: vagas ?? 0 }, (_, indice) => (
+                  <label key={indice}><span>Alvo {uso.registrados + indice + 1}</span>
+                    <select name="target_id" defaultValue="">
+                      <option value="">Nenhum</option>
+                      {fichas.map((ficha) => <option key={ficha.id} value={ficha.id}>{ficha.name}</option>)}
+                    </select>
+                  </label>
+                ))}
+                <Enviar>Aplicar nestes alvos</Enviar>
+              </>
+            )}
+          </form>
+        )
+      })}
     </section>
   )
 }

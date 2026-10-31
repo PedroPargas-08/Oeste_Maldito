@@ -2,9 +2,10 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { describe, it } from "node:test"
 import { HABILIDADES_DE_MARCA, MARCAS } from "./marks-catalog.ts"
-import { absorcaoPermitida, alcancePermitido, alvoAutorizado, avisosDeHabilidade, curaLimitada, custoEspirito, danoRecurso, fichaRestaurada, relogioDoEfeito, vidaTemporaria } from "./marks.ts"
+import { absorcaoPermitida, alcancePermitido, alvoAutorizado, avisosDeHabilidade, curaLimitada, custoEspirito, danoRecurso, fichaRestaurada, limiteDeAlvosEscrito, montarUsosArea, relogioDoEfeito, vagasDeAlvo, vidaTemporaria } from "./marks.ts"
 
 const correcoes = readFileSync(new URL("../supabase/migrations/20261031223000_marcas_correcoes.sql", import.meta.url), "utf8")
+const limiteAlvos = readFileSync(new URL("../supabase/migrations/20261031233000_limite_alvos.sql", import.meta.url), "utf8")
 
 const migracao = readFileSync(new URL("../supabase/migrations/20261031180000_marcas.sql", import.meta.url), "utf8")
 const catalogoSql = migracao.split("-- Catálogo inicial")[1] ?? ""
@@ -138,5 +139,61 @@ describe("correções de autorização e essência", () => {
     const erupcao = avisosDeHabilidade({ kind: "combate", slug: "erupcao-necrotica", target_count: "varios", requires_essence: true, damage_pv: 200 })
     assert.match(erupcao.join(" "), /ninguém recebe dano automático/)
     assert.match(erupcao.join(" "), /carga não é gasta/)
+    assert.match(erupcao.join(" "), /quantidade máxima de alvos não está definida/)
+  })
+})
+
+describe("limite de alvos", () => {
+  it("só numera o que o texto da habilidade já define", () => {
+    const limites = new Map<string, number>()
+    for (const item of HABILIDADES_DE_MARCA) {
+      const limite = limiteDeAlvosEscrito(item)
+      if (limite != null) limites.set(item.slug, limite)
+    }
+    assert.deepEqual(Object.fromEntries(limites), {
+      "ricochete-guiado": 3,
+      "saque-relampago-fantasma": 2,
+      "duelo-de-fantoches": 2,
+    })
+    assert.equal(HABILIDADES_DE_MARCA.filter((item) => limiteDeAlvosEscrito(item) == null).length, 32)
+  })
+
+  it("grava esses tetos no banco e deixa o restante sem quantidade", () => {
+    for (const [slug, limite] of [
+      ["ricochete-guiado", 3],
+      ["saque-relampago-fantasma", 2],
+      ["duelo-de-fantoches", 2],
+    ] as const) {
+      assert.match(limiteAlvos, new RegExp(`set max_targets = ${limite}\\s+where slug = '${slug}'`))
+    }
+    for (const slug of ["chuva-de-chumbo-espectral", "investida-brutal", "grito-de-panico", "campo-de-desorientacao", "expulsa-de-morte", "erupcao-necrotica"]) {
+      assert.equal(limiteDeAlvosEscrito(HABILIDADES_DE_MARCA.find((item) => item.slug === slug)!), null)
+      assert.doesNotMatch(limiteAlvos, new RegExp(`slug = '${slug}'`))
+    }
+    assert.match(limiteAlvos, /v_novos > 0 and v_ja \+ v_novos > v_ab\.max_targets/)
+    assert.match(limiteAlvos, /Essa habilidade aceita no máximo/)
+  })
+
+  it("mostra o teto conhecido e preserva vaga quando a regra não define", () => {
+    const ricochete = avisosDeHabilidade({ kind: "ativavel", slug: "ricochete-guiado", target_count: "varios", max_targets: 3 })
+    assert.match(ricochete.join(" "), /No máximo 3 alvos/)
+    const chuva = avisosDeHabilidade({ kind: "combate", slug: "chuva-de-chumbo-espectral", target_count: "varios", max_targets: null })
+    assert.match(chuva.join(" "), /quantidade máxima de alvos não está definida/)
+    assert.equal(vagasDeAlvo(1, 3), 2)
+    assert.equal(vagasDeAlvo(3, 3), 0)
+    assert.equal(vagasDeAlvo(4, 3), 0)
+    assert.equal(vagasDeAlvo(9, null), null)
+    const usos = montarUsosArea(
+      [
+        { id: "a", note: "nota", name: "Ricochete Guiado", targetCount: "varios", maxTargets: 3 },
+        { id: "b", note: "nota", name: "Chuva", targetCount: "varios", maxTargets: null },
+        { id: "c", note: "nota", name: "Toque", targetCount: "um", maxTargets: null },
+      ],
+      [{ ability_use_id: "a" }, { ability_use_id: "a" }],
+    )
+    assert.equal(usos.length, 2)
+    assert.equal(usos[0]?.registrados, 2)
+    assert.equal(usos[0]?.maxTargets, 3)
+    assert.equal(usos[1]?.maxTargets, null)
   })
 })

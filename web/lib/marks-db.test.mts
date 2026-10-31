@@ -41,6 +41,8 @@ describe("banco local das Marcas", () => {
       await arquivo(db, "supabase/migrations/20261031180000_marcas.sql")
       await arquivo(db, "supabase/migrations/20261031223000_marcas_correcoes.sql")
       await arquivo(db, "supabase/migrations/20261031223000_marcas_correcoes.sql")
+      await arquivo(db, "supabase/migrations/20261031233000_limite_alvos.sql")
+      await arquivo(db, "supabase/migrations/20261031233000_limite_alvos.sql")
       await arquivo(db, "supabase/tests/marcas_regras.sql")
 
       const lista = await psql(db, `

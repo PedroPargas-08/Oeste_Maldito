@@ -469,3 +469,266 @@ set status = 'encerrado', ended_at = now()
 where id = 'abababab-abab-abab-abab-abababababab';
 select public.corrigir_recurso('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'espirito', 30, 'corrida');
 select public.corrigir_recurso('cccccccc-cccc-cccc-cccc-cccccccccccc', 'pv', 300, 'corrida');
+
+do $$
+begin
+  if (select max_targets from public.abilities where slug = 'ricochete-guiado') <> 3 then
+    raise exception 'Ricochete deveria limitar 3 alvos.';
+  end if;
+  if (select max_targets from public.abilities where slug = 'saque-relampago-fantasma') <> 2 then
+    raise exception 'Saque deveria limitar 2 alvos.';
+  end if;
+  if (select max_targets from public.abilities where slug = 'duelo-de-fantoches') <> 2 then
+    raise exception 'Duelo deveria limitar 2 alvos.';
+  end if;
+  if (select damage_pv from public.abilities where slug = 'ricochete-guiado') is not null
+     or (select spirit_cost from public.abilities where slug = 'ricochete-guiado') <> 25 then
+    raise exception 'O limite alterou dano ou custo do Ricochete.';
+  end if;
+  if exists (
+    select 1 from public.abilities
+    where slug in (
+      'chuva-de-chumbo-espectral', 'investida-brutal', 'grito-de-panico',
+      'campo-de-desorientacao', 'expulsa-de-morte', 'erupcao-necrotica'
+    ) and max_targets is not null
+  ) then
+    raise exception 'Habilidade sem quantidade definida recebeu limite.';
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
+update public.characters
+set mark_id = (select id from public.marks where slug = 'gatilho-fantasma')
+where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+select public.corrigir_recurso('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'espirito', 200, 'limite');
+select public.usar_habilidade(
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  (select id from public.abilities where slug = 'ricochete-guiado'),
+  null,
+  null
+);
+
+do $$
+declare
+  v_use uuid;
+  v_spirit int;
+begin
+  select id into v_use
+  from public.ability_uses
+  where character_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    and ability_id = (select id from public.abilities where slug = 'ricochete-guiado')
+  order by created_at desc
+  limit 1;
+  select spirit_current into v_spirit
+  from public.characters
+  where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  begin
+    perform public.registrar_alvos_habilidade(v_use, array[
+      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+      'cccccccc-cccc-cccc-cccc-cccccccccccc',
+      'dddddddd-dddd-dddd-dddd-dddddddddddd'
+    ]::uuid[]);
+    raise exception 'Ricochete aceitou 4 alvos.';
+  exception when others then
+    if sqlerrm = 'Ricochete aceitou 4 alvos.' then
+      raise;
+    end if;
+    if sqlerrm <> 'Essa habilidade aceita no máximo 3 alvo(s).' then
+      raise exception 'Limite do Ricochete: %', sqlerrm;
+    end if;
+  end;
+  if (select count(*) from public.ability_use_targets where ability_use_id = v_use) <> 0 then
+    raise exception 'Falha do limite gravou alvos.';
+  end if;
+  if (select spirit_current from public.characters where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb') <> v_spirit then
+    raise exception 'O limite alterou o Espírito.';
+  end if;
+  if (select pv_current from public.characters where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') <> 300 then
+    raise exception 'O limite alterou PV.';
+  end if;
+  perform set_config('audit.use_ricochete', v_use::text, false);
+end $$;
+
+select public.registrar_alvos_habilidade(
+  current_setting('audit.use_ricochete')::uuid,
+  array[
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    'dddddddd-dddd-dddd-dddd-dddddddddddd'
+  ]::uuid[]
+);
+
+do $$
+declare
+  v_use uuid := current_setting('audit.use_ricochete')::uuid;
+begin
+  begin
+    perform public.registrar_alvos_habilidade(v_use, array['bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb']::uuid[]);
+    raise exception 'Ricochete aceitou o quarto alvo.';
+  exception when others then
+    if sqlerrm = 'Ricochete aceitou o quarto alvo.' then
+      raise;
+    end if;
+    if sqlerrm <> 'Essa habilidade aceita no máximo 3 alvo(s).' then
+      raise exception 'Quarto alvo: %', sqlerrm;
+    end if;
+  end;
+  if (select count(*) from public.ability_use_targets where ability_use_id = v_use) <> 3 then
+    raise exception 'O quarto alvo apagou ou gravou registros.';
+  end if;
+end $$;
+
+select public.registrar_alvos_habilidade(
+  current_setting('audit.use_ricochete')::uuid,
+  array[
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    'dddddddd-dddd-dddd-dddd-dddddddddddd'
+  ]::uuid[]
+);
+
+insert into public.ability_use_targets (ability_use_id, target_id)
+values (
+  current_setting('audit.use_ricochete')::uuid,
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+);
+select public.registrar_alvos_habilidade(
+  current_setting('audit.use_ricochete')::uuid,
+  array[
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    'dddddddd-dddd-dddd-dddd-dddddddddddd'
+  ]::uuid[]
+);
+
+do $$
+begin
+  if (select count(*) from public.ability_use_targets where ability_use_id = current_setting('audit.use_ricochete')::uuid) <> 4 then
+    raise exception 'Registro antigo acima do limite foi apagado.';
+  end if;
+end $$;
+
+insert into public.combats (id, status, active_character_id)
+values ('cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd', 'em_andamento', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+select public.usar_habilidade(
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  (select id from public.abilities where slug = 'saque-relampago-fantasma'),
+  null,
+  null
+);
+
+do $$
+declare
+  v_use uuid;
+begin
+  select id into v_use
+  from public.ability_uses
+  where ability_id = (select id from public.abilities where slug = 'saque-relampago-fantasma')
+  order by created_at desc
+  limit 1;
+  begin
+    perform public.registrar_alvos_habilidade(v_use, array[
+      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      'cccccccc-cccc-cccc-cccc-cccccccccccc',
+      'dddddddd-dddd-dddd-dddd-dddddddddddd'
+    ]::uuid[]);
+    raise exception 'Saque aceitou 3 alvos.';
+  exception when others then
+    if sqlerrm = 'Saque aceitou 3 alvos.' then
+      raise;
+    end if;
+    if sqlerrm <> 'Essa habilidade aceita no máximo 2 alvo(s).' then
+      raise exception 'Limite do Saque: %', sqlerrm;
+    end if;
+  end;
+  perform public.registrar_alvos_habilidade(v_use, array[
+    'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    'dddddddd-dddd-dddd-dddd-dddddddddddd'
+  ]::uuid[]);
+  if (select count(*) from public.ability_use_targets where ability_use_id = v_use) <> 2 then
+    raise exception 'Saque não guardou os 2 alvos.';
+  end if;
+end $$;
+
+update public.characters
+set mark_id = (select id from public.marks where slug = 'redea-sombria')
+where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+select public.usar_habilidade(
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  (select id from public.abilities where slug = 'duelo-de-fantoches'),
+  null,
+  null
+);
+
+do $$
+declare
+  v_use uuid;
+begin
+  select id into v_use
+  from public.ability_uses
+  where ability_id = (select id from public.abilities where slug = 'duelo-de-fantoches')
+  order by created_at desc
+  limit 1;
+  begin
+    perform public.registrar_alvos_habilidade(v_use, array[
+      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      'cccccccc-cccc-cccc-cccc-cccccccccccc',
+      'dddddddd-dddd-dddd-dddd-dddddddddddd'
+    ]::uuid[]);
+    raise exception 'Duelo aceitou 3 alvos.';
+  exception when others then
+    if sqlerrm = 'Duelo aceitou 3 alvos.' then
+      raise;
+    end if;
+    if sqlerrm <> 'Essa habilidade aceita no máximo 2 alvo(s).' then
+      raise exception 'Limite do Duelo: %', sqlerrm;
+    end if;
+  end;
+  if (select count(*) from public.ability_use_targets where ability_use_id = v_use) <> 0 then
+    raise exception 'Duelo gravou alvos acima do limite.';
+  end if;
+  perform public.registrar_alvos_habilidade(v_use, array[
+    'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    'dddddddd-dddd-dddd-dddd-dddddddddddd'
+  ]::uuid[]);
+  if (select count(*) from public.ability_use_targets where ability_use_id = v_use) <> 2 then
+    raise exception 'Duelo não guardou o alvo e o capanga.';
+  end if;
+end $$;
+
+select public.usar_habilidade(
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  (select id from public.abilities where slug = 'grito-de-panico'),
+  null,
+  null
+);
+
+do $$
+declare
+  v_use uuid;
+begin
+  select id into v_use
+  from public.ability_uses
+  where ability_id = (select id from public.abilities where slug = 'grito-de-panico')
+  order by created_at desc
+  limit 1;
+  perform public.registrar_alvos_habilidade(v_use, array[
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    'dddddddd-dddd-dddd-dddd-dddddddddddd'
+  ]::uuid[]);
+  if (select count(*) from public.ability_use_targets where ability_use_id = v_use) <> 4 then
+    raise exception 'Grito sem quantidade definida recusou alvos.';
+  end if;
+  if (select pv_current from public.characters where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') <> 300 then
+    raise exception 'Grito alterou PV.';
+  end if;
+end $$;
+
+update public.combats
+set status = 'encerrado', ended_at = now()
+where id = 'cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd';

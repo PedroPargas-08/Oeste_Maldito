@@ -233,6 +233,11 @@ export async function criarHabilidade(formData: FormData) {
   }
   const kind = String(formData.get("kind") ?? "ativavel")
   const spirit = kind === "passiva" ? 0 : Number(formData.get("spirit_cost") ?? 10)
+  const maximoTexto = String(formData.get("max_targets") ?? "").trim()
+  const maximo = maximoTexto ? Number(maximoTexto) : null
+  if (maximoTexto && (!/^\d+$/.test(maximoTexto) || (maximo ?? 0) < 1)) {
+    falhar(destino, "O máximo de alvos, quando existe, é um inteiro a partir de 1.")
+  }
   const { error } = await mesa.supabase.from("abilities").insert({
     name: String(formData.get("name") ?? "").trim(),
     description: String(formData.get("description") ?? ""),
@@ -255,6 +260,7 @@ export async function criarHabilidade(formData: FormData) {
     target_count: ["nenhum", "proprio", "um", "varios"].includes(String(formData.get("target_count") ?? ""))
       ? String(formData.get("target_count"))
       : kind === "passiva" ? "nenhum" : "um",
+    max_targets: maximo,
   })
   if (error) falhar(destino, textoErro(error)!)
   concluir(destino)

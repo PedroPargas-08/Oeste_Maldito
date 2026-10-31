@@ -70,10 +70,49 @@ export function absorcaoPermitida(entrada: {
   return { ok: true as const }
 }
 
+export function limiteDeAlvosEscrito(habilidade: { slug: string; target: string; area: string }) {
+  if (habilidade.slug === "duelo-de-fantoches") {
+    const area = habilidade.area.toLowerCase()
+    if (area.includes("um alvo") && area.includes("opcionalmente") && area.includes("um capanga")) return 2
+    return null
+  }
+  const inimigos = habilidade.target.match(/até\s+(\d+)\s+inimigos/i)
+  const alvos = habilidade.area.match(/até\s+(\d+)\s+alvos/i)
+  if (!inimigos || !alvos || inimigos[1] !== alvos[1]) return null
+  return Number(inimigos[1])
+}
+
+export function vagasDeAlvo(jaRegistrados: number, limite: number | null) {
+  if (limite == null) return null
+  return Math.max(0, limite - Math.max(0, jaRegistrados))
+}
+
+export function montarUsosArea(
+  usos: { id: string; note: string; name: string; targetCount?: string | null; maxTargets?: number | null }[],
+  registrados: { ability_use_id: string }[],
+) {
+  const contagem = new Map<string, number>()
+  for (const item of registrados) {
+    contagem.set(item.ability_use_id, (contagem.get(item.ability_use_id) ?? 0) + 1)
+  }
+  return usos.flatMap((uso) => {
+    if (uso.targetCount !== "varios") return []
+    const limite = uso.maxTargets != null && uso.maxTargets >= 1 ? uso.maxTargets : null
+    return [{
+      id: uso.id,
+      name: uso.name || "Habilidade",
+      note: uso.note,
+      maxTargets: limite,
+      registrados: contagem.get(uso.id) ?? 0,
+    }]
+  })
+}
+
 export function avisosDeHabilidade(habilidade: {
   kind: string
   slug?: string | null
   target_count?: string | null
+  max_targets?: number | null
   damage_pv?: number | null
   damage_spirit?: number | null
   heal_pv?: number | null
@@ -97,6 +136,11 @@ export function avisosDeHabilidade(habilidade: {
   if (modo === "varios") {
     avisos.push("Vários alvos: o Espírito é cobrado uma vez e ninguém recebe dano automático nesta ativação.")
     avisos.push("O mestre registra cada atingido. O alcance não é calculado por posição.")
+    if (habilidade.max_targets != null && habilidade.max_targets >= 1) {
+      avisos.push(`No máximo ${habilidade.max_targets} alvos nesta ativação. O servidor recusa o excedente.`)
+    } else {
+      avisos.push("A quantidade máxima de alvos não está definida.")
+    }
   } else if (modo === "um" && ((habilidade.damage_pv ?? 0) > 0 || (habilidade.damage_spirit ?? 0) > 0)) {
     avisos.push("O número de dano é aplicado no alvo autorizado: você, um NPC ou, para o mestre, qualquer ficha.")
   } else if (modo === "proprio" && ((habilidade.heal_pv ?? 0) > 0 || (habilidade.heal_spirit ?? 0) > 0)) {

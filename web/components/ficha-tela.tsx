@@ -21,6 +21,7 @@ import { ajustarTemporarios, atribuirMarca } from "@/lib/actions/marcas"
 import { CartaHabilidade, FormaAlvosArea } from "@/components/habilidade-carta"
 import { FichaEditor } from "@/components/ficha-editor"
 import { Aviso, Enviar, Medidor } from "@/components/ui"
+import { montarUsosArea } from "@/lib/marks"
 import { exigirMesa, quando, relacao } from "@/lib/mesa"
 import {
   ATRIBUTOS,
@@ -99,13 +100,25 @@ export async function FichaTela({ id, erro }: { id?: string; erro?: string }) {
     : { data: [] }
   const cadaveres = (cadaveresRpc ?? []).map((item: { id: string; name: string }) => ({ id: item.id, name: item.name || "Sem nome" }))
   const { data: usosBrutos } = mesa.isMaster
-    ? await mesa.supabase.from("ability_uses").select("id, note, ability_id, abilities(name, target_count)").eq("character_id", ficha.id).order("created_at", { ascending: false }).limit(8)
+    ? await mesa.supabase.from("ability_uses").select("id, note, ability_id, abilities(name, target_count, max_targets)").eq("character_id", ficha.id).order("created_at", { ascending: false }).limit(8)
     : { data: [] }
-  const usosArea = (usosBrutos ?? []).flatMap((uso) => {
-    const habilidade = relacao(uso.abilities) as { name?: string; target_count?: string } | null
-    if (habilidade?.target_count !== "varios") return []
-    return [{ id: uso.id as string, name: habilidade.name || "Habilidade", note: uso.note as string }]
-  })
+  const idsDeUso = (usosBrutos ?? []).map((uso) => uso.id as string)
+  const { data: alvosRegistrados } = mesa.isMaster && idsDeUso.length
+    ? await mesa.supabase.from("ability_use_targets").select("ability_use_id").in("ability_use_id", idsDeUso)
+    : { data: [] }
+  const usosArea = montarUsosArea(
+    (usosBrutos ?? []).map((uso) => {
+      const habilidade = relacao(uso.abilities) as { name?: string; target_count?: string; max_targets?: number | null } | null
+      return {
+        id: uso.id as string,
+        note: uso.note as string,
+        name: habilidade?.name || "Habilidade",
+        targetCount: habilidade?.target_count,
+        maxTargets: habilidade?.max_targets,
+      }
+    }),
+    alvosRegistrados ?? [],
+  )
   const personalizadas = (todasHabilidades ?? []).filter((item) => !item.mark_id)
 
   return (
