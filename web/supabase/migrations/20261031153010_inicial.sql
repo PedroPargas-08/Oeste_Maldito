@@ -1910,7 +1910,7 @@ using (
       (select private.is_approved())
       and exists (
         select 1 from public.library_files f
-        where f.storage_path = name and f.shared
+        where f.storage_path = storage.objects.name and f.shared
       )
     )
   )
@@ -1939,7 +1939,7 @@ using (
         or exists (
           select 1 from public.achievements ac
           left join public.characters ch on ch.id = ac.character_id
-          where ac.image_path = name
+          where ac.image_path = storage.objects.name
             and (ac.shared or ch.player_id = (select auth.uid()))
         )
       )
