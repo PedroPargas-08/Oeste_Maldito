@@ -8,7 +8,7 @@ export type Perfil = {
   id: string
   display_name: string
   role: "player" | "master" | "co_master"
-  membership_status: "sem_convite" | "pendente" | "aprovado" | "recusado"
+  membership_status: "sem_convite" | "pendente" | "aprovado" | "recusado" | "expulso"
 }
 
 export type Aventura = {

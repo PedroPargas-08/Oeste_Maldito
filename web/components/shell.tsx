@@ -55,6 +55,7 @@ export function Shell({
   isMaster,
   isPrincipal,
   approved,
+  expulso = false,
   archived,
   encerramento,
   tema,
@@ -67,12 +68,13 @@ export function Shell({
   isMaster: boolean
   isPrincipal: boolean
   approved: boolean
+  expulso?: boolean
   archived: boolean
   encerramento: boolean
   tema: Tema
   logoUrl: string | null
 }) {
-  const papel = isPrincipal ? "Mestre" : isMaster ? "Co-mestre" : approved ? "Jogador" : "Aguardando"
+  const papel = isPrincipal ? "Mestre" : isMaster ? "Co-mestre" : expulso ? "Expulso" : approved ? "Jogador" : "Aguardando"
   const mesa: Atalho[] = approved && (isMaster || encerramento) ? [...MESA, ["/encerramento", "Encerramento"]] : [...MESA]
   const mestre: Atalho[] = isMaster
     ? [
@@ -90,7 +92,7 @@ export function Shell({
           <strong>{titulo}</strong>
         </Link>
         <div className="nav-scroll">
-          {approved ? (
+          {expulso ? <p className="muted">Sem acesso à mesa.</p> : approved ? (
             <>
               <Bloco titulo="Mesa" links={mesa} caminho={caminho} />
               <Bloco titulo="Personagem" links={PERSONAGEM} caminho={caminho} />

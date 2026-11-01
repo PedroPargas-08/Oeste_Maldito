@@ -12,7 +12,9 @@ export default async function MesaLayout({ children }: { children: React.ReactNo
   const mesa = await exigirMesa()
   if (!mesa.profile || !mesa.adventure) redirect("/")
   const caminho = (await headers()).get("x-pathname") ?? ""
-  const livre = caminho.startsWith("/aguardando") || caminho.startsWith("/ficha")
+  const expulso = mesa.profile.membership_status === "expulso"
+  const livre = caminho.startsWith("/aguardando") || (!expulso && caminho.startsWith("/ficha"))
+  if (expulso && !caminho.startsWith("/aguardando")) redirect("/aguardando")
   if (!mesa.approved && !livre) redirect("/aguardando")
   if (!mesa.isMaster && (caminho.startsWith("/auditoria") || caminho.startsWith("/configuracoes") || caminho.startsWith("/marcas"))) redirect("/painel")
   if (!mesa.isMaster && caminho.startsWith("/encerramento") && !mesa.adventure.closing_published) redirect("/lobby")
@@ -27,6 +29,7 @@ export default async function MesaLayout({ children }: { children: React.ReactNo
       isMaster={mesa.isMaster}
       isPrincipal={mesa.isPrincipal}
       approved={mesa.approved}
+      expulso={expulso}
       archived={mesa.archived}
       encerramento={mesa.adventure.closing_published}
       tema={lerTema(mesa.adventure.theme)}

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test lib/rules.test.mts lib/marks.test.mts lib/marks-db.test.mts"
+    "test": "node --experimental-strip-types --test lib/rules.test.mts lib/marks.test.mts lib/marks-db.test.mts lib/confirmacao-reset.test.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

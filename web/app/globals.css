@@ -357,6 +357,49 @@ input:focus, select:focus, textarea:focus {
   .main, .meter span, .btn, .nav a { animation: none; transition: none; }
 }
 
+.mesa-acoes {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+.mesa-acoes form { display: flex; margin: 0; }
+.mesa-acoes .btn { min-height: 2.2rem; }
+.table td.acoes { vertical-align: middle; text-align: right; }
+.field-action { display: flex; align-items: flex-end; justify-content: flex-end; }
+.grid-2 > .field-action { grid-column: 1 / -1; }
+.field-action .btn { align-self: flex-end; width: auto; height: auto; }
+.panel.danger-zone { border-color: var(--secondary); }
+.panel.danger-zone::before {
+  background: linear-gradient(90deg, transparent, var(--secondary), transparent);
+  opacity: 1;
+}
+.panel.danger-zone h2 { color: #e7b2a8; text-transform: uppercase; }
+.modal-back {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(8, 6, 4, 0.72);
+}
+.modal-card { width: min(34rem, 100%); margin: 0; }
+.modal-card h2 { text-transform: uppercase; }
+.toast {
+  position: fixed;
+  right: 1.2rem;
+  bottom: 1.2rem;
+  z-index: 50;
+  max-width: 22rem;
+}
+.fold li .btn { margin-left: 0.6rem; }
+
 @media (max-width: 860px) {
   .shell { grid-template-columns: 1fr; }
   .nav {

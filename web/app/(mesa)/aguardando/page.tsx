@@ -6,6 +6,7 @@ const TEXTO = {
   sem_convite: "Informe o código da mesa. O mestre ainda precisa reconhecer você e a ficha.",
   pendente: "O mestre está conferindo quem você é e se a ficha é a sua.",
   recusado: "O mestre recusou esta entrada. Um código novo pode reabrir o pedido.",
+  expulso: "Você foi expulso da mesa. Só o mestre principal pode readmitir. A ficha foi mantida.",
   aprovado: "Sua entrada já foi aprovada.",
 }
 
@@ -27,7 +28,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
           <Enviar>Pedir entrada</Enviar>
         </form>
       ) : null}
-      {!mesa.isMaster && status !== "aprovado" ? (
+      {!mesa.isMaster && status !== "aprovado" && status !== "expulso" ? (
         <p className="muted">Enquanto isso, a ficha pode ser preenchida e enviada. O restante da mesa abre depois da aprovação.</p>
       ) : null}
     </section>

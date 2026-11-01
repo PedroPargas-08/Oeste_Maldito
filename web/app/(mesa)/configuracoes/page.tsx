@@ -1,5 +1,6 @@
 import { criarCondicao, criarHabilidade } from "@/lib/actions/ficha"
 import { criarBackup, enviarMarca, regenerarConvite, restaurarBackup, salvarMesa } from "@/lib/actions/mesa"
+import { ReiniciarCampanha } from "@/components/reiniciar-campanha"
 import { Aviso, Enviar } from "@/components/ui"
 import { ENCICLOPEDIA } from "@/lib/encyclopedia"
 import { exigirMesa, quando } from "@/lib/mesa"
@@ -123,6 +124,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
         <p className="muted">O primeiro mestre principal continua vindo de MASTER_EMAIL ou do banco. Co-mestre desta mesa é promovido no painel e não arquiva a campanha, não recria o convite e não restaura backup.</p>
         <p className="muted">Temas de referência: escuro {temaEscuro.primary}, claro {temaClaro.primary}.</p>
       </section>
+      {mesa.isPrincipal ? <ReiniciarCampanha nome={mesa.adventure.name} /> : null}
     </section>
   )
 }

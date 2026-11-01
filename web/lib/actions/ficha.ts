@@ -3,6 +3,7 @@
 import { ATRIBUTOS, PERICIAS, distribuicaoInvalida, espiritoMaximo, pvMaximo, type AtributoKey, type PericiaKey } from "@/lib/rules"
 import { textoErro } from "@/lib/errors"
 import { falhar, concluir } from "@/lib/flow"
+import { requireMestrePrincipal } from "@/lib/authz"
 import { exigirMesa } from "@/lib/mesa"
 
 function numero(formData: FormData, chave: string) {
@@ -153,9 +154,8 @@ export async function carregarEnergia(formData: FormData) {
 }
 
 export async function apagarFicha(formData: FormData) {
-  const mesa = await exigirMesa()
+  const mesa = await requireMestrePrincipal()
   const destino = String(formData.get("destino") ?? "/painel")
-  if (!mesa.isMaster) falhar(destino, "Somente o mestre apaga uma ficha.")
   if (String(formData.get("confirm") ?? "") !== "APAGAR") falhar(destino, "Digite APAGAR para confirmar.")
   const { error } = await mesa.supabase.from("characters").delete().eq("id", String(formData.get("id") ?? ""))
   if (error) falhar("/painel", textoErro(error)!)
@@ -277,18 +277,6 @@ export async function criarHabilidade(formData: FormData) {
       ? String(formData.get("target_count"))
       : kind === "passiva" ? "nenhum" : "um",
     max_targets: maximo,
-  })
-  if (error) falhar(destino, textoErro(error)!)
-  concluir(destino)
-}
-
-export async function atribuirHabilidade(formData: FormData) {
-  const mesa = await exigirMesa()
-  const destino = String(formData.get("destino") ?? "/ficha")
-  if (!mesa.isMaster) falhar(destino, "Somente o mestre atribui habilidade.")
-  const { error } = await mesa.supabase.from("character_abilities").insert({
-    character_id: String(formData.get("character_id") ?? ""),
-    ability_id: String(formData.get("ability_id") ?? ""),
   })
   if (error) falhar(destino, textoErro(error)!)
   concluir(destino)

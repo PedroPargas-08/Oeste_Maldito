@@ -1,13 +1,7 @@
 import Link from "next/link"
-import { expulsarJogador, promoverCoMestre, removerCoMestre } from "@/lib/actions/mesa"
-import { Enviar, Medidor } from "@/components/ui"
+import { MesaMembros } from "@/components/mesa-membros"
+import { Aviso, Medidor } from "@/components/ui"
 import { exigirMesa, relacao } from "@/lib/mesa"
-
-const PAPEL: Record<string, string> = {
-  player: "Jogador",
-  master: "Mestre",
-  co_master: "Co-mestre",
-}
 
 const STATUS: Record<string, string> = {
   rascunho: "Rascunho",
@@ -16,11 +10,12 @@ const STATUS: Record<string, string> = {
   incompleta: "Incompleta",
 }
 
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<{ erro?: string; ok?: string }> }) {
+  const { erro, ok } = await searchParams
   const mesa = await exigirMesa()
   if (!mesa.isMaster) {
     const { data: ficha } = await mesa.supabase.from("characters").select("*").eq("player_id", mesa.userId).maybeSingle()
-    if (!ficha) return <section className="page-head"><h1>Painel</h1><p><Link href="/ficha">Criar ficha</Link></p></section>
+    if (!ficha) return <section className="page-head"><Aviso erro={erro} ok={ok} /><h1>Painel</h1><p><Link href="/ficha">Criar ficha</Link></p></section>
     const [{ data: armas }, { data: habilidades }, { data: daMarca }, { data: condicoes }, { data: marca }] = await Promise.all([
       mesa.supabase.from("inventory").select("equipped, ammo, quantity, item_definitions(name, category)").eq("character_id", ficha.id).eq("equipped", true),
       mesa.supabase.from("character_abilities").select("abilities(name)").eq("character_id", ficha.id),
@@ -30,6 +25,7 @@ export default async function Page() {
     ])
     return (
       <section className="stack">
+        <Aviso erro={erro} ok={ok} />
         <header className="page-head"><p className="kicker">{marca?.name ?? "Consulta"}</p><h1>{ficha.name || "Sua ficha"}</h1>{marca ? <p className="lede">{marca.seal_name}</p> : null}</header>
         <div className="grid-2">
           <article className="panel"><h2>PV</h2><Medidor atual={ficha.pv_current} maximo={ficha.pv_max} /></article>
@@ -57,54 +53,34 @@ export default async function Page() {
   }
 
   const { data: fichas } = await mesa.supabase.from("characters").select("id, name, player_id, sheet_status, pv_current, pv_max, spirit_current, spirit_max").order("name")
-  const { data: perfis } = await mesa.supabase.from("profiles").select("id, display_name, role, membership_status").order("display_name")
+  const { data: perfis } = await mesa.supabase.from("profiles").select("id, display_name, role, membership_status").in("membership_status", ["aprovado", "pendente"]).order("display_name")
+  const { data: exMembros } = await mesa.supabase.from("profiles").select("id, display_name, role, membership_status").eq("membership_status", "expulso").order("display_name")
+  const idsExpulsos = new Set((exMembros ?? []).map((pessoa) => pessoa.id))
+  const fichasAtivas = (fichas ?? []).filter((ficha) => !ficha.player_id || !idsExpulsos.has(ficha.player_id))
   const { data: condicoes } = await mesa.supabase.from("character_conditions").select("character_id, conditions(name)")
   const { data: armas } = await mesa.supabase.from("inventory").select("character_id, item_definitions(name)").eq("equipped", true)
   const { data: combate } = await mesa.supabase.from("combats").select("active_character_id, status").eq("status", "em_andamento").maybeSingle()
 
   return (
     <section className="stack">
+      <Aviso erro={erro} ok={ok} />
       <header className="page-head"><p className="kicker">{mesa.isPrincipal ? "Mestre" : "Co-mestre"}</p><h1>Painel</h1></header>
       <section className="panel stack">
         <h2>Mesa</h2>
-        <p className="muted">Um mestre principal. O co-mestre conduz a mesa e não promove outro co-mestre, não substitui o principal e não encerra a campanha. Expulsar não apaga a ficha.</p>
-        <table className="table">
-          <thead><tr><th>Pessoa</th><th>Papel</th><th>Entrada</th><th></th></tr></thead>
-          <tbody>
-            {(perfis ?? []).map((pessoa) => (
-              <tr key={pessoa.id}>
-                <td>{pessoa.display_name}</td>
-                <td>{PAPEL[pessoa.role] ?? pessoa.role}</td>
-                <td>{pessoa.membership_status}</td>
-                <td>
-                  {mesa.isPrincipal && pessoa.role === "player" ? (
-                    <form action={promoverCoMestre}>
-                      <input type="hidden" name="user_id" value={pessoa.id} />
-                      <Enviar>Tornar co-mestre</Enviar>
-                    </form>
-                  ) : null}
-                  {mesa.isPrincipal && pessoa.role === "co_master" ? (
-                    <form action={removerCoMestre}>
-                      <input type="hidden" name="user_id" value={pessoa.id} />
-                      <button className="btn" type="submit">Voltar a jogador</button>
-                    </form>
-                  ) : null}
-                  {pessoa.role === "player" && pessoa.membership_status === "aprovado" ? (
-                    <form action={expulsarJogador}>
-                      <input type="hidden" name="user_id" value={pessoa.id} />
-                      <button className="btn danger" type="submit">Expulsar</button>
-                    </form>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <p className="muted">Um mestre principal. O co-mestre conduz a mesa e não promove outro co-mestre, não substitui o principal e não encerra a campanha. Expulsar não apaga a ficha. Reiniciar a campanha e expulsar jogadores é decisão exclusiva do mestre principal.</p>
+        <MesaMembros
+          principal={mesa.isPrincipal}
+          pessoas={perfis ?? []}
+          exMembros={(exMembros ?? []).map((pessoa) => {
+            const ficha = (fichas ?? []).find((item) => item.player_id === pessoa.id)
+            return { id: pessoa.id, display_name: pessoa.display_name, fichaId: ficha?.id ?? null, fichaNome: ficha?.name || null }
+          })}
+        />
       </section>
       <table className="table">
         <thead><tr><th>Personagem</th><th>Jogador</th><th>PV</th><th>Espírito</th><th>Ficha</th><th>Condições</th><th>Armas</th><th>Sessão</th></tr></thead>
         <tbody>
-          {(fichas ?? []).map((ficha) => (
+          {fichasAtivas.map((ficha) => (
             <tr key={ficha.id}>
               <td><Link href={`/ficha/${ficha.id}`}>{ficha.name || "Sem nome"}</Link></td>
               <td>{perfis?.find((item) => item.id === ficha.player_id)?.display_name ?? "—"}</td>
