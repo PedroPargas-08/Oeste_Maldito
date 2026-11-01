@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { recuperar } from "@/lib/actions/auth"
 import { Aviso } from "@/components/ui"
 
@@ -15,7 +16,7 @@ export default async function Recuperar({ searchParams }: { searchParams: Promis
           <Aviso erro={avisos.erro} ok={avisos.ok} />
           <label><span>E-mail</span><input name="email" type="email" required /></label>
           <button className="btn solid" type="submit">Enviar</button>
-          <p className="muted"><a href="/">Voltar</a></p>
+          <p className="muted"><Link href="/">Voltar</Link></p>
         </form>
       </section>
     </main>

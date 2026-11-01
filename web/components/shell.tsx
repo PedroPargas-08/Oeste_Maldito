@@ -3,20 +3,49 @@ import { sair } from "@/lib/actions/auth"
 import type { Tema } from "@/lib/theme"
 import { estiloDoTema } from "@/lib/theme"
 
-const JOGADOR = [
+type Atalho = readonly [href: string, label: string]
+
+const MESA: Atalho[] = [
   ["/lobby", "Lobby"],
   ["/painel", "Painel"],
-  ["/ficha", "Ficha"],
   ["/combate", "Combate"],
+]
+
+const PERSONAGEM: Atalho[] = [
+  ["/ficha", "Ficha"],
+  ["/montarias", "Montarias"],
+  ["/financas", "Finanças"],
+  ["/anotacoes", "Anotações"],
+]
+
+const MUNDO: Atalho[] = [
   ["/diario", "Diário"],
   ["/biblioteca", "Biblioteca"],
   ["/enciclopedia", "Enciclopédia"],
-  ["/montarias", "Montarias"],
   ["/conquistas", "Conquistas"],
   ["/galeria", "Galeria"],
-  ["/anotacoes", "Anotações"],
-  ["/financas", "Finanças"],
-] as const
+]
+
+function ativo(caminho: string, href: string) {
+  if (href === "/lobby" || href === "/aguardando") return caminho === href
+  return caminho === href || caminho.startsWith(href)
+}
+
+function Bloco({ titulo, links, caminho }: { titulo: string; links: readonly Atalho[]; caminho: string }) {
+  if (!links.length) return null
+  return (
+    <div className="nav-block">
+      <p className="nav-label">{titulo}</p>
+      <nav className="nav-group">
+        {links.map(([href, label]) => (
+          <Link key={href} href={href} className={ativo(caminho, href) ? "active" : ""}>
+            {label}
+          </Link>
+        ))}
+      </nav>
+    </div>
+  )
+}
 
 export function Shell({
   children,
@@ -43,9 +72,15 @@ export function Shell({
   tema: Tema
   logoUrl: string | null
 }) {
-  const links = !approved
-    ? [["/aguardando", "Entrada"], ["/ficha", "Ficha"]] as const
-    : JOGADOR
+  const papel = isPrincipal ? "Mestre" : isMaster ? "Co-mestre" : approved ? "Jogador" : "Aguardando"
+  const mesa: Atalho[] = approved && (isMaster || encerramento) ? [...MESA, ["/encerramento", "Encerramento"]] : [...MESA]
+  const mestre: Atalho[] = isMaster
+    ? [
+        ["/marcas", "Marcas"],
+        ["/auditoria", "Auditoria"],
+        ["/configuracoes", "Configurações"],
+      ]
+    : []
 
   return (
     <div className="shell" style={estiloDoTema(tema)}>
@@ -54,25 +89,20 @@ export function Shell({
           {logoUrl ? <img className="logo" src={logoUrl} alt="" /> : <span>Weird West</span>}
           <strong>{titulo}</strong>
         </Link>
-        <nav className="nav-group">
-          {links.map(([href, label]) => (
-            <Link key={href} href={href} className={caminho === href || (href !== "/lobby" && caminho.startsWith(href)) ? "active" : ""}>
-              {label}
-            </Link>
-          ))}
-          {approved && (isMaster || encerramento) ? (
-            <Link href="/encerramento" className={caminho.startsWith("/encerramento") ? "active" : ""}>Encerramento</Link>
-          ) : null}
-          {isMaster ? (
+        <div className="nav-scroll">
+          {approved ? (
             <>
-              <Link href="/marcas" className={caminho.startsWith("/marcas") ? "active" : ""}>Marcas</Link>
-              <Link href="/auditoria" className={caminho.startsWith("/auditoria") ? "active" : ""}>Auditoria</Link>
-              <Link href="/configuracoes" className={caminho.startsWith("/configuracoes") ? "active" : ""}>Configurações</Link>
+              <Bloco titulo="Mesa" links={mesa} caminho={caminho} />
+              <Bloco titulo="Personagem" links={PERSONAGEM} caminho={caminho} />
+              <Bloco titulo="Mundo" links={MUNDO} caminho={caminho} />
+              <Bloco titulo="Condução" links={mestre} caminho={caminho} />
             </>
-          ) : null}
-        </nav>
+          ) : (
+            <Bloco titulo="Entrada" links={[["/aguardando", "Entrada"], ["/ficha", "Ficha"]]} caminho={caminho} />
+          )}
+        </div>
         <div className="nav-foot">
-          <p className="who">{nome}{isPrincipal ? " · mestre" : isMaster ? " · co-mestre" : ""}</p>
+          <p className="who"><span className="papel">{papel}</span> {nome}</p>
           <form action={sair}><button type="submit">Sair</button></form>
         </div>
       </aside>
