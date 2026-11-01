@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server"
 export type Perfil = {
   id: string
   display_name: string
-  role: "player" | "master"
+  role: "player" | "master" | "co_master"
   membership_status: "sem_convite" | "pendente" | "aprovado" | "recusado"
 }
 
@@ -80,7 +80,8 @@ export const getMesa = cache(async () => {
 
   const perfil = profile as Perfil
   const aventura = { ...(adventure as Aventura), rules: regrasVisiveis((adventure as Aventura).rules) }
-  const isMaster = perfil.role === "master"
+  const isPrincipal = perfil.role === "master"
+  const isMaster = isPrincipal || perfil.role === "co_master"
   return {
     supabase,
     userId,
@@ -88,6 +89,7 @@ export const getMesa = cache(async () => {
     profile: perfil,
     adventure: aventura,
     isMaster,
+    isPrincipal,
     approved: isMaster || perfil.membership_status === "aprovado",
     archived: aventura.status === "arquivada",
   }

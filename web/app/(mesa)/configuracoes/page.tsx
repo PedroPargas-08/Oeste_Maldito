@@ -63,7 +63,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
       <section className="panel stack">
         <h2>Convite</h2>
         <p>{segredo?.invite_code}</p>
-        <form action={regenerarConvite}><button className="btn" type="submit">Gerar outro código</button></form>
+        {mesa.isPrincipal ? <form action={regenerarConvite}><button className="btn" type="submit">Gerar outro código</button></form> : <p className="muted">Só o mestre principal gera outro código.</p>}
       </section>
       <form action={criarHabilidade} className="panel stack">
         <h2>Habilidade</h2>
@@ -102,21 +102,25 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
       </form>
       <section className="panel stack">
         <h2>Backup</h2>
-        <p className="muted">A frequência e a retenção ainda não foram definidas. Nada é apagado sozinho. O mestre cria e restaura quando quiser. Anotações privadas não entram no backup.</p>
+        <p className="muted">A frequência e a retenção ainda não foram definidas. Nada é apagado sozinho. A mesa cria o backup. Só o mestre principal restaura. Anotações privadas não entram no backup.</p>
         <form action={criarBackup} className="row"><label><span>Rótulo</span><input name="label" /></label><Enviar>Criar backup agora</Enviar></form>
         {(backups ?? []).map((item) => (
           <form key={item.id} action={restaurarBackup} className="row">
             <input type="hidden" name="backup_id" value={item.id} />
             <span>{item.label} · {quando(item.created_at)}</span>
-            <input name="confirm" placeholder="RESTAURAR" />
-            <button className="btn danger" type="submit">Restaurar</button>
+            {mesa.isPrincipal ? (
+              <>
+                <input name="confirm" placeholder="RESTAURAR" />
+                <button className="btn danger" type="submit">Restaurar</button>
+              </>
+            ) : <span className="muted">Restauração do mestre principal</span>}
           </form>
         ))}
       </section>
       <section className="panel">
         <h2>Fora desta versão</h2>
         <ul>{FORA.map((item) => <li key={item}>{item}</li>)}</ul>
-        <p className="muted">Papel de mestre não se escolhe aqui. Ou o e-mail de MASTER_EMAIL promove a primeira conta, ou o papel é gravado direto no banco.</p>
+        <p className="muted">O primeiro mestre principal continua vindo de MASTER_EMAIL ou do banco. Co-mestre desta mesa é promovido no painel e não arquiva a campanha, não recria o convite e não restaura backup.</p>
         <p className="muted">Temas de referência: escuro {temaEscuro.primary}, claro {temaClaro.primary}.</p>
       </section>
     </section>

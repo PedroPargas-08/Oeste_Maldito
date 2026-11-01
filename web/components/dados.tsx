@@ -5,6 +5,20 @@ import { rolar } from "@/lib/actions/combate"
 import { Enviar } from "@/components/ui"
 import { ATRIBUTOS, PERICIAS } from "@/lib/rules"
 
+const AJUDA: Record<string, string> = {
+  livre: "Qualquer dado. Não altera a ficha.",
+  iniciativa: "1d20 + Agilidade. Pode gravar de novo a ordem do combate aberto.",
+  teste: "1d20 + um atributo e, no máximo, uma perícia. A CD continua com a mesa.",
+  ataque: "1d20 + Vigor + Briga. O 1 natural fica registrado para o mestre decidir. Esta rolagem não debita PV.",
+  defesa: "1d20 + Vigor. Mostra a redução. 20 natural vale 100%.",
+  desempate: "1d20 puro, sem atributo nem perícia.",
+  dano_desarmado: "Vigor + 1d20 entra nos PV do alvo. A redução da defesa só acontece na disputa.",
+  dano_lamina: "Vigor + 2d20 entra nos PV do alvo. A redução da defesa só acontece na disputa.",
+  esquiva: "1d20 puro, só quando a mesa pede. Não é automática contra tiro.",
+  corpo: "Resolve ataque, defesa e dano. O valor já reduzido sai dos PV.",
+  disparo: "O servidor rola 1d6 + Mira + Atirar. Além do alcance efetivo o tiro erra e gasta munição. O acerto debita o dano fixo.",
+}
+
 export function Dados({
   personagens,
   armas,
@@ -15,7 +29,8 @@ export function Dados({
   const [preset, setPreset] = useState("livre")
   return (
     <form action={rolar} className="panel stack">
-      <h2>Rolagem do mestre</h2>
+      <h2>Rolagem da mesa</h2>
+      <p className="dica">{AJUDA[preset]}</p>
       <label><span>Tipo</span>
         <select name="preset" value={preset} onChange={(evento) => setPreset(evento.target.value)}>
           <option value="livre">Livre</option>
@@ -47,6 +62,14 @@ export function Dados({
           <select name="character_id">{personagens.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
         </label>
       ) : null}
+      {preset === "dano_desarmado" || preset === "dano_lamina" ? (
+        <>
+          <label><span>Alvo</span>
+            <select name="target_id">{personagens.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+          </label>
+          <p className="muted">Este dano entra nos PV do alvo. A redução da defesa só entra na disputa corpo a corpo.</p>
+        </>
+      ) : null}
       {preset === "iniciativa" ? <label className="check"><input type="checkbox" name="aplicar" /> Aplicar na iniciativa do combate atual</label> : null}
       {preset === "teste" ? (
         <div className="grid-2">
@@ -71,7 +94,11 @@ export function Dados({
           <label><span>Arma</span>
             <select name="inventory_id">{armas.map((item) => <option key={item.id} value={item.id}>{item.dono} — {item.name}</option>)}</select>
           </label>
+          <label><span>Alvo</span>
+            <select name="target_id">{personagens.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+          </label>
           <label><span>Distância em metros</span><input name="distance" type="number" min={0} required /></label>
+          <p className="muted">Além do alcance efetivo o tiro erra e gasta a munição. O acerto debita o dano fixo nos PV.</p>
         </div>
       ) : null}
       <Enviar>Rolar</Enviar>

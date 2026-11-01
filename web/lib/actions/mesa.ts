@@ -67,9 +67,33 @@ export async function enviarMarca(formData: FormData) {
   concluir("/configuracoes")
 }
 
+export async function promoverCoMestre(formData: FormData) {
+  const mesa = await exigirMesa()
+  if (!mesa.isPrincipal) falhar("/painel", "Só o mestre principal promove co-mestre.")
+  const { error } = await mesa.supabase.rpc("promover_co_mestre", { p_user_id: String(formData.get("user_id") ?? "") })
+  if (error) falhar("/painel", textoErro(error)!)
+  concluir("/painel")
+}
+
+export async function removerCoMestre(formData: FormData) {
+  const mesa = await exigirMesa()
+  if (!mesa.isPrincipal) falhar("/painel", "Só o mestre principal remove co-mestre.")
+  const { error } = await mesa.supabase.rpc("remover_co_mestre", { p_user_id: String(formData.get("user_id") ?? "") })
+  if (error) falhar("/painel", textoErro(error)!)
+  concluir("/painel")
+}
+
+export async function expulsarJogador(formData: FormData) {
+  const mesa = await exigirMesa()
+  if (!mesa.isMaster) falhar("/painel", "A expulsão depende da mesa.")
+  const { error } = await mesa.supabase.rpc("expulsar_jogador", { p_user_id: String(formData.get("user_id") ?? "") })
+  if (error) falhar("/painel", textoErro(error)!)
+  concluir("/painel")
+}
+
 export async function regenerarConvite() {
   const mesa = await exigirMesa()
-  if (!mesa.isMaster) falhar("/configuracoes", "Somente o mestre recria o convite.")
+  if (!mesa.isPrincipal) falhar("/configuracoes", "Somente o mestre principal recria o convite.")
   const { error } = await mesa.supabase.rpc("regenerar_convite")
   if (error) falhar("/configuracoes", textoErro(error)!)
   concluir("/configuracoes")
@@ -77,7 +101,7 @@ export async function regenerarConvite() {
 
 export async function publicarEncerramento(formData: FormData) {
   const mesa = await exigirMesa()
-  if (!mesa.isMaster) falhar("/encerramento", "Somente o mestre publica o encerramento.")
+  if (!mesa.isPrincipal) falhar("/encerramento", "Somente o mestre principal publica o encerramento.")
   const { error } = await mesa.supabase
     .from("adventure")
     .update({
@@ -93,7 +117,7 @@ export async function publicarEncerramento(formData: FormData) {
 
 export async function reabrirAventura() {
   const mesa = await exigirMesa()
-  if (!mesa.isMaster) falhar("/encerramento", "Somente o mestre reabre a aventura.")
+  if (!mesa.isPrincipal) falhar("/encerramento", "Somente o mestre principal reabre a aventura.")
   const { error } = await mesa.supabase.from("adventure").update({ status: "ativa" }).eq("id", 1)
   if (error) falhar("/encerramento", textoErro(error)!)
   concluir("/encerramento")
@@ -109,7 +133,7 @@ export async function criarBackup(formData: FormData) {
 
 export async function restaurarBackup(formData: FormData) {
   const mesa = await exigirMesa()
-  if (!mesa.isMaster) falhar("/configuracoes", "Somente o mestre restaura um backup.")
+  if (!mesa.isPrincipal) falhar("/configuracoes", "Somente o mestre principal restaura um backup.")
   const { error } = await mesa.supabase.rpc("restaurar_backup", {
     p_backup_id: String(formData.get("backup_id") ?? ""),
     p_confirm: String(formData.get("confirm") ?? ""),

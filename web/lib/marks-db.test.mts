@@ -43,6 +43,8 @@ describe("banco local das Marcas", () => {
       await arquivo(db, "supabase/migrations/20261031223000_marcas_correcoes.sql")
       await arquivo(db, "supabase/migrations/20261031233000_limite_alvos.sql")
       await arquivo(db, "supabase/migrations/20261031233000_limite_alvos.sql")
+      await arquivo(db, "supabase/migrations/20261101010000_co_mestre_combate.sql")
+      await arquivo(db, "supabase/migrations/20261101010000_co_mestre_combate.sql")
       await arquivo(db, "supabase/tests/marcas_regras.sql")
 
       const lista = await psql(db, `
@@ -98,6 +100,8 @@ describe("banco local das Marcas", () => {
       assert.match(dupla.filter((item) => item.code !== 0)[0].err, /já teve a essência absorvida/)
       const essencia = await psql(db, `select essence_stored::text from public.characters where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';`)
       assert.match(essencia.out, /3/)
+
+      await arquivo(db, "supabase/tests/mesa_combate.sql")
     } finally {
       await comando(`drop database if exists ${db};`)
     }

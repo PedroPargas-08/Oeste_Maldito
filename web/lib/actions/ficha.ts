@@ -117,6 +117,20 @@ export async function corrigirRecurso(formData: FormData) {
   concluir(destino)
 }
 
+export async function tratar(formData: FormData) {
+  const mesa = await exigirMesa()
+  const destino = String(formData.get("destino") ?? "/ficha")
+  if (!mesa.isMaster) falhar(destino, "O tratamento é rolado pela mesa.")
+  const cd = Number(formData.get("cd"))
+  if (!Number.isInteger(cd) || cd < 1) falhar(destino, "Informe a CD do mestre.")
+  const { error } = await mesa.supabase.rpc("tratar", {
+    p_character_id: String(formData.get("character_id") ?? ""),
+    p_cd: cd,
+  })
+  if (error) falhar(destino, textoErro(error)!)
+  concluir(destino)
+}
+
 export async function descansar(formData: FormData) {
   const mesa = await exigirMesa()
   const destino = String(formData.get("destino") ?? "/ficha")
@@ -140,7 +154,9 @@ export async function carregarEnergia(formData: FormData) {
 
 export async function apagarFicha(formData: FormData) {
   const mesa = await exigirMesa()
-  if (!mesa.isMaster) falhar("/painel", "Somente o mestre apaga uma ficha.")
+  const destino = String(formData.get("destino") ?? "/painel")
+  if (!mesa.isMaster) falhar(destino, "Somente o mestre apaga uma ficha.")
+  if (String(formData.get("confirm") ?? "") !== "APAGAR") falhar(destino, "Digite APAGAR para confirmar.")
   const { error } = await mesa.supabase.from("characters").delete().eq("id", String(formData.get("id") ?? ""))
   if (error) falhar("/painel", textoErro(error)!)
   concluir("/painel")

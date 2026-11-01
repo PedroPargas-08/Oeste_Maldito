@@ -25,6 +25,7 @@ export default async function MesaLayout({ children }: { children: React.ReactNo
       titulo={mesa.adventure.name}
       nome={mesa.profile.display_name}
       isMaster={mesa.isMaster}
+      isPrincipal={mesa.isPrincipal}
       approved={mesa.approved}
       archived={mesa.archived}
       encerramento={mesa.adventure.closing_published}

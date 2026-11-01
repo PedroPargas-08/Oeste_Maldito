@@ -10,6 +10,7 @@ import {
   corrigirRecurso,
   criarFicha,
   descansar,
+  tratar,
   editarCondicao,
   removerCondicao,
   removerHabilidade,
@@ -178,13 +179,13 @@ export async function FichaTela({ id, erro }: { id?: string; erro?: string }) {
             </form>
           </div>
           <div className="row">
-            {(["curto", "longo", "tratamento"] as const).map((kind) => (
+            {(["curto", "longo"] as const).map((kind) => (
               <form key={kind} action={descansar}>
                 <input type="hidden" name="character_id" value={ficha.id} />
                 <input type="hidden" name="destino" value={destino} />
                 <input type="hidden" name="kind" value={kind} />
                 <button className="btn" type="submit">
-                  {kind === "curto" ? `Descanso curto +${recuperacaoPv(ficha.pv_max, 20)} PV` : kind === "longo" ? `Descanso longo +${recuperacaoPv(ficha.pv_max, 60)} PV` : `Tratamento +${recuperacaoPv(ficha.pv_max, 80)} PV`}
+                  {kind === "curto" ? `Descanso curto +${recuperacaoPv(ficha.pv_max, 20)} PV` : `Descanso longo +${recuperacaoPv(ficha.pv_max, 60)} PV`}
                 </button>
               </form>
             ))}
@@ -194,7 +195,16 @@ export async function FichaTela({ id, erro }: { id?: string; erro?: string }) {
               <button className="btn" type="submit">Carregar ação · 10 Espírito</button>
             </form>
           </div>
-          <p className="muted">Descanso curto e longo também enchem o Espírito. Tratamento não. O acréscimo de PV é o percentual do máximo, arredondado ao inteiro mais próximo.</p>
+          <p className="muted">Descanso curto e longo também enchem o Espírito. O acréscimo de PV é o percentual do máximo, arredondado ao inteiro mais próximo.</p>
+          {mesa.isMaster ? (
+            <form action={tratar} className="row">
+              <input type="hidden" name="character_id" value={ficha.id} />
+              <input type="hidden" name="destino" value={destino} />
+              <label><span>CD do tratamento</span><input name="cd" type="number" min={1} required /></label>
+              <Enviar>Tratar · 1d20 + Astúcia + Medicina</Enviar>
+              <p className="muted">Sucesso recupera {recuperacaoPv(ficha.pv_max, 80)} PV e não mexe no Espírito. Medicina 0 soma zero. Falha não cura.</p>
+            </form>
+          ) : null}
           {mesa.isMaster ? (
             <form action={corrigirRecurso} className="row">
               <input type="hidden" name="character_id" value={ficha.id} />
@@ -410,8 +420,10 @@ export async function FichaTela({ id, erro }: { id?: string; erro?: string }) {
       </section>
 
       {mesa.isMaster ? (
-        <form action={apagarFicha}>
+        <form action={apagarFicha} className="row">
           <input type="hidden" name="id" value={ficha.id} />
+          <input type="hidden" name="destino" value={destino} />
+          <label><span>Digite APAGAR</span><input name="confirm" required /></label>
           <button className="btn danger" type="submit">Apagar ficha</button>
         </form>
       ) : null}

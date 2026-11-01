@@ -6,7 +6,9 @@ import {
   aplicarDano,
   aplicarRecuperacao,
   consequenciaEsquiva,
+  danoAposReducao,
   disparoAcerta,
+  disparoForaDoAlcance,
   deslocamento,
   distribuicaoInvalida,
   espiritoMaximo,
@@ -94,6 +96,19 @@ describe("combate", () => {
   it("acerta o disparo quando 1d6 + Mira + Atirar alcança a distância", () => {
     assert.equal(disparoAcerta(4, 3, 2, 9), true)
     assert.equal(disparoAcerta(4, 3, 2, 10), false)
+  })
+
+  it("erra sozinho além do alcance efetivo e deixa passar arma sem alcance", () => {
+    assert.equal(disparoForaDoAlcance(13, 2, 10), true)
+    assert.equal(disparoForaDoAlcance(12, 2, 10), false)
+    assert.equal(disparoForaDoAlcance(100, null, 10), false)
+  })
+
+  it("aplica a redução da defesa no dano inteiro", () => {
+    assert.equal(danoAposReducao(21, 0), 21)
+    assert.equal(danoAposReducao(21, 10), 19)
+    assert.equal(danoAposReducao(21, 100), 0)
+    assert.equal(danoAposReducao(15, 90), 2)
   })
 
   it("desloca 5 + Agilidade", () => {
