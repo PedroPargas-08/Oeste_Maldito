@@ -24,13 +24,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
       </div>
       <ul>{(pessoas ?? []).map((pessoa) => <li key={pessoa.name}>{pessoa.name || "Sem nome"} · {pessoa.sheet_status}</li>)}</ul>
       {mesa.adventure.closing_summary ? <article className="panel"><h2>Resumo</h2><p>{mesa.adventure.closing_summary}</p></article> : null}
-      {mesa.isMaster ? (
+      {mesa.isPrincipal ? (
         <form action={publicarEncerramento} className="panel stack">
           <label><span>Resumo para publicar</span><textarea name="closing_summary" defaultValue={mesa.adventure.closing_summary} /></label>
           <Enviar>Publicar e arquivar</Enviar>
         </form>
       ) : null}
-      {mesa.isMaster && mesa.archived ? (
+      {mesa.isPrincipal && mesa.archived ? (
         <form action={reabrirAventura}><button className="btn" type="submit">Reabrir a aventura</button></form>
       ) : null}
     </section>

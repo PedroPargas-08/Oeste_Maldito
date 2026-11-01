@@ -152,11 +152,33 @@ export async function rolar(formData: FormData) {
 
   try {
     if (preset === "disparo") {
-      const dado = rolarDado(6)
       const { error } = await mesa.supabase.rpc("registrar_disparo", {
         p_inventory_id: String(formData.get("inventory_id") ?? ""),
+        p_target_id: String(formData.get("target_id") ?? ""),
         p_distance: Number(formData.get("distance")),
-        p_die: dado,
+        p_visibility: visibility,
+      })
+      if (error) falhar("/combate", textoErro(error)!)
+      concluir("/combate")
+    }
+
+    if (preset === "corpo") {
+      const { error } = await mesa.supabase.rpc("resolver_corpo", {
+        p_attacker: String(formData.get("attacker_id") ?? ""),
+        p_defender: String(formData.get("defender_id") ?? ""),
+        p_mode: formData.get("mode") === "lamina" ? "lamina" : "desarmado",
+        p_aware: formData.get("aware") === "sim",
+        p_visibility: visibility,
+      })
+      if (error) falhar("/combate", textoErro(error)!)
+      concluir("/combate")
+    }
+
+    if (preset === "dano_desarmado" || preset === "dano_lamina") {
+      const { error } = await mesa.supabase.rpc("aplicar_dano_corpo", {
+        p_attacker: String(formData.get("character_id") ?? ""),
+        p_defender: String(formData.get("target_id") ?? ""),
+        p_mode: preset === "dano_lamina" ? "lamina" : "desarmado",
         p_visibility: visibility,
       })
       if (error) falhar("/combate", textoErro(error)!)
@@ -216,7 +238,11 @@ export async function rolar(formData: FormData) {
       dice = [rolarDado(20)]
       modifier = ficha.vigor + ficha.briga
       label = `Ataque — ${ficha.name}`
-      detail = dice[0] === 20 ? "20 natural no ataque: ação extra. Não altera o dano corpo a corpo." : "1d20 + Vigor + Briga"
+      detail = dice[0] === 1
+        ? "1 natural. Falha crítica: a consequência fica com o mestre."
+        : dice[0] === 20
+          ? "20 natural no ataque: ação extra. Não altera o dano corpo a corpo."
+          : "1d20 + Vigor + Briga"
     } else if (preset === "defesa") {
       if (!ficha) falhar("/combate", "Escolha o personagem.")
       dice = [rolarDado(20)]
@@ -228,71 +254,10 @@ export async function rolar(formData: FormData) {
       dice = [rolarDado(20)]
       label = "Desempate"
       detail = "1d20 puro."
-    } else if (preset === "dano_desarmado") {
-      if (!ficha) falhar("/combate", "Escolha o personagem.")
-      dice = [rolarDado(20)]
-      modifier = ficha.vigor
-      label = `Dano desarmado — ${ficha.name}`
-      detail = "Vigor + 1d20. O mestre confirma o PV perdido."
-    } else if (preset === "dano_lamina") {
-      if (!ficha) falhar("/combate", "Escolha o personagem.")
-      dice = rolarVarios(2, 20)
-      modifier = ficha.vigor
-      label = `Dano de lâmina — ${ficha.name}`
-      detail = "Vigor + 2d20. O mestre confirma o PV perdido."
     } else if (preset === "esquiva") {
       dice = [rolarDado(20)]
       label = "Esquiva"
       detail = consequenciaEsquiva(dice[0]!)
-    } else if (preset === "corpo") {
-      const atacanteId = String(formData.get("attacker_id") ?? "")
-      const defensorId = String(formData.get("defender_id") ?? "")
-      const { data: par } = await mesa.supabase.from("characters").select("*").in("id", [atacanteId, defensorId])
-      const atacante = par?.find((item) => item.id === atacanteId)
-      const defensor = par?.find((item) => item.id === defensorId)
-      if (!atacante || !defensor) falhar("/combate", "Escolha atacante e defensor.")
-      const modo = formData.get("mode") === "lamina" ? "lamina" : "desarmado"
-      const percebeu = formData.get("aware") === "sim"
-      const partes: string[] = []
-      if (!percebeu) {
-        const dados = modo === "lamina" ? rolarVarios(2, 20) : [rolarDado(20)]
-        dice = dados
-        modifier = atacante.vigor
-        partes.push("Alvo desprevenido: golpe garantido, sem defesa e sem redução.")
-        partes.push(`Dano bruto ${dados.reduce((soma, n) => soma + n, 0) + atacante.vigor} (${dados.join(" + ")} + Vigor).`)
-      } else {
-        const ataqueDie = rolarDado(20)
-        const defesaDie = rolarDado(20)
-        const ataqueMod = atacante.vigor + atacante.briga
-        const defesaMod = defensor.vigor
-        let ataque = ataqueDie + ataqueMod
-        let defesa = defesaDie + defesaMod
-        const extras: string[] = []
-        let guardas = 0
-        while (ataque === defesa && guardas < 30) {
-          const a = rolarDado(20)
-          const b = rolarDado(20)
-          extras.push(`Desempate ${a} contra ${b}.`)
-          ataque = a
-          defesa = b
-          guardas += 1
-        }
-        const dadosDano = ataque > defesa ? (modo === "lamina" ? rolarVarios(2, 20) : [rolarDado(20)]) : []
-        dice = [ataqueDie]
-        modifier = ataqueMod
-        const red = reducaoDefesa(defesaDie, defesaDie + defesaMod)
-        partes.push(`Ataque ${ataqueDie + ataqueMod} contra defesa ${defesaDie + defesaMod}.`)
-        if (ataqueDie === 20) partes.push("20 natural no ataque: ação extra. Não altera o dano corpo a corpo.")
-        partes.push(...extras)
-        if (ataque === defesa) partes.push("O desempate ainda empatou. Role de novo.")
-        else partes.push(ataque > defesa ? `${atacante.name} vence a disputa.` : `${defensor.name} vence a disputa.`)
-        partes.push(`Redução da defesa: ${red}%, mesmo se a defesa perder. 20 natural na defesa vale 100%.`)
-        if (dadosDano.length) {
-          partes.push(`Dano bruto ${dadosDano.reduce((soma, n) => soma + n, 0) + atacante.vigor}. O mestre confirma o PV perdido.`)
-        }
-      }
-      label = `Corpo a corpo — ${atacante.name}`
-      detail = partes.join(" ")
     }
 
     const total = dice.reduce((soma, valor) => soma + valor, 0) + modifier

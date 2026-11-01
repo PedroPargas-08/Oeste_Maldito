@@ -24,6 +24,7 @@ export function Shell({
   titulo,
   nome,
   isMaster,
+  isPrincipal,
   approved,
   archived,
   encerramento,
@@ -35,6 +36,7 @@ export function Shell({
   titulo: string
   nome: string
   isMaster: boolean
+  isPrincipal: boolean
   approved: boolean
   archived: boolean
   encerramento: boolean
@@ -70,7 +72,7 @@ export function Shell({
           ) : null}
         </nav>
         <div className="nav-foot">
-          <p className="who">{nome}{isMaster ? " · mestre" : ""}</p>
+          <p className="who">{nome}{isPrincipal ? " · mestre" : isMaster ? " · co-mestre" : ""}</p>
           <form action={sair}><button type="submit">Sair</button></form>
         </div>
       </aside>

@@ -47,6 +47,14 @@ export function Dados({
           <select name="character_id">{personagens.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
         </label>
       ) : null}
+      {preset === "dano_desarmado" || preset === "dano_lamina" ? (
+        <>
+          <label><span>Alvo</span>
+            <select name="target_id">{personagens.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+          </label>
+          <p className="muted">Este dano entra nos PV do alvo. A redução da defesa só entra na disputa corpo a corpo.</p>
+        </>
+      ) : null}
       {preset === "iniciativa" ? <label className="check"><input type="checkbox" name="aplicar" /> Aplicar na iniciativa do combate atual</label> : null}
       {preset === "teste" ? (
         <div className="grid-2">
@@ -71,7 +79,11 @@ export function Dados({
           <label><span>Arma</span>
             <select name="inventory_id">{armas.map((item) => <option key={item.id} value={item.id}>{item.dono} — {item.name}</option>)}</select>
           </label>
+          <label><span>Alvo</span>
+            <select name="target_id">{personagens.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+          </label>
           <label><span>Distância em metros</span><input name="distance" type="number" min={0} required /></label>
+          <p className="muted">Além do alcance efetivo o tiro erra e gasta a munição. O acerto debita o dano fixo nos PV.</p>
         </div>
       ) : null}
       <Enviar>Rolar</Enviar>

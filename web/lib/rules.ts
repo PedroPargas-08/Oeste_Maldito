@@ -130,6 +130,15 @@ export function alcanceEfetivo(alcance: number, mira: number) {
   return alcance + mira
 }
 
+export function disparoForaDoAlcance(distancia: number, alcanceArma: number | null, mira: number) {
+  if (alcanceArma == null) return false
+  return distancia > alcanceArma + mira
+}
+
+export function danoAposReducao(dano: number, reducao: number) {
+  return Math.round((dano * (100 - reducao)) / 100)
+}
+
 export function recuperacaoPv(maximo: number, percentual: 20 | 60 | 80) {
   return Math.round((maximo * percentual) / 100)
 }
