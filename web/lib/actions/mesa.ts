@@ -1,6 +1,14 @@
 "use server"
 
 import { temaClaro, temaEscuro } from "@/lib/theme"
+import { requireMestrePrincipal } from "@/lib/authz"
+import {
+  expulsarNoBanco,
+  promoverNoBanco,
+  readmitirNoBanco,
+  reiniciarNoBanco,
+  removerCoMestreNoBanco,
+} from "@/lib/comandos-mesa"
 import { textoErro } from "@/lib/errors"
 import { concluir, falhar } from "@/lib/flow"
 import { exigirMesa } from "@/lib/mesa"
@@ -14,12 +22,16 @@ export async function usarConvite(formData: FormData) {
 }
 
 export async function decidirEntrada(formData: FormData) {
+  const destino = formData.get("destino") === "/painel" ? "/painel" : "/lobby"
   const mesa = await exigirMesa()
-  if (!mesa.isMaster) falhar("/lobby", "A aprovação depende do mestre.")
+  if (!mesa.isMaster) falhar(destino, "A aprovação depende do mestre.")
+  const userId = String(formData.get("user_id") ?? "")
+  const { data: alvo } = await mesa.supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
+  if (alvo?.role === "master") falhar(destino, "O mestre não tem entrada de jogador na própria mesa.")
   const status = formData.get("status") === "recusado" ? "recusado" : "aprovado"
-  const { error } = await mesa.supabase.from("profiles").update({ membership_status: status }).eq("id", String(formData.get("user_id") ?? ""))
-  if (error) falhar("/lobby", textoErro(error)!)
-  concluir("/lobby")
+  const { error } = await mesa.supabase.from("profiles").update({ membership_status: status }).eq("id", userId)
+  if (error) falhar(destino, textoErro(error)!)
+  concluir(destino)
 }
 
 export async function salvarMesa(formData: FormData) {
@@ -68,40 +80,49 @@ export async function enviarMarca(formData: FormData) {
 }
 
 export async function promoverCoMestre(formData: FormData) {
-  const mesa = await exigirMesa()
-  if (!mesa.isPrincipal) falhar("/painel", "Só o mestre principal promove co-mestre.")
-  const { error } = await mesa.supabase.rpc("promover_co_mestre", { p_user_id: String(formData.get("user_id") ?? "") })
-  if (error) falhar("/painel", textoErro(error)!)
+  await requireMestrePrincipal()
+  const resultado = await promoverNoBanco(String(formData.get("user_id") ?? ""))
+  if (!resultado.ok) falhar("/painel", resultado.erro)
   concluir("/painel")
 }
 
 export async function removerCoMestre(formData: FormData) {
-  const mesa = await exigirMesa()
-  if (!mesa.isPrincipal) falhar("/painel", "Só o mestre principal remove co-mestre.")
-  const { error } = await mesa.supabase.rpc("remover_co_mestre", { p_user_id: String(formData.get("user_id") ?? "") })
-  if (error) falhar("/painel", textoErro(error)!)
+  await requireMestrePrincipal()
+  const resultado = await removerCoMestreNoBanco(String(formData.get("user_id") ?? ""))
+  if (!resultado.ok) falhar("/painel", resultado.erro)
   concluir("/painel")
 }
 
 export async function expulsarJogador(formData: FormData) {
-  const mesa = await exigirMesa()
-  if (!mesa.isMaster) falhar("/painel", "A expulsão depende da mesa.")
-  const { error } = await mesa.supabase.rpc("expulsar_jogador", { p_user_id: String(formData.get("user_id") ?? "") })
-  if (error) falhar("/painel", textoErro(error)!)
+  await requireMestrePrincipal()
+  const resultado = await expulsarNoBanco(String(formData.get("user_id") ?? ""))
+  if (!resultado.ok) falhar("/painel", resultado.erro)
+  concluir("/painel")
+}
+
+export async function readmitirJogador(formData: FormData) {
+  await requireMestrePrincipal()
+  const resultado = await readmitirNoBanco(String(formData.get("user_id") ?? ""))
+  if (!resultado.ok) falhar("/painel", resultado.erro)
+  concluir("/painel")
+}
+
+export async function reiniciarCampanha(formData: FormData) {
+  await requireMestrePrincipal()
+  const resultado = await reiniciarNoBanco(String(formData.get("confirm") ?? ""))
+  if (!resultado.ok) falhar("/configuracoes", resultado.erro)
   concluir("/painel")
 }
 
 export async function regenerarConvite() {
-  const mesa = await exigirMesa()
-  if (!mesa.isPrincipal) falhar("/configuracoes", "Somente o mestre principal recria o convite.")
+  const mesa = await requireMestrePrincipal()
   const { error } = await mesa.supabase.rpc("regenerar_convite")
   if (error) falhar("/configuracoes", textoErro(error)!)
   concluir("/configuracoes")
 }
 
 export async function publicarEncerramento(formData: FormData) {
-  const mesa = await exigirMesa()
-  if (!mesa.isPrincipal) falhar("/encerramento", "Somente o mestre principal publica o encerramento.")
+  const mesa = await requireMestrePrincipal()
   const { error } = await mesa.supabase
     .from("adventure")
     .update({
@@ -116,8 +137,7 @@ export async function publicarEncerramento(formData: FormData) {
 }
 
 export async function reabrirAventura() {
-  const mesa = await exigirMesa()
-  if (!mesa.isPrincipal) falhar("/encerramento", "Somente o mestre principal reabre a aventura.")
+  const mesa = await requireMestrePrincipal()
   const { error } = await mesa.supabase.from("adventure").update({ status: "ativa" }).eq("id", 1)
   if (error) falhar("/encerramento", textoErro(error)!)
   concluir("/encerramento")
@@ -132,8 +152,7 @@ export async function criarBackup(formData: FormData) {
 }
 
 export async function restaurarBackup(formData: FormData) {
-  const mesa = await exigirMesa()
-  if (!mesa.isPrincipal) falhar("/configuracoes", "Somente o mestre principal restaura um backup.")
+  const mesa = await requireMestrePrincipal()
   const { error } = await mesa.supabase.rpc("restaurar_backup", {
     p_backup_id: String(formData.get("backup_id") ?? ""),
     p_confirm: String(formData.get("confirm") ?? ""),

@@ -105,27 +105,132 @@ exception when others then
   end if;
 end $$;
 
-select set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', false);
+do $$
+begin
+  perform set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', false);
+  perform public.expulsar_jogador('55555555-5555-5555-5555-555555555555');
+  raise exception 'co-mestre expulsou';
+exception when others then
+  if sqlerrm = 'co-mestre expulsou' then raise; end if;
+  if sqlerrm <> 'Só o mestre principal pode fazer isso.' then
+    raise exception 'co-mestre expulsar: %', sqlerrm;
+  end if;
+end $$;
+
+do $$
+begin
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', false);
+  perform public.expulsar_jogador('55555555-5555-5555-5555-555555555555');
+  raise exception 'jogador expulsou';
+exception when others then
+  if sqlerrm = 'jogador expulsou' then raise; end if;
+  if sqlerrm <> 'Só o mestre principal pode fazer isso.' then
+    raise exception 'jogador expulsar: %', sqlerrm;
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
 select public.expulsar_jogador('55555555-5555-5555-5555-555555555555');
 
 do $$
 begin
-  if (select membership_status from public.profiles where id = '55555555-5555-5555-5555-555555555555') <> 'recusado' then
-    raise exception 'Expulsão não recusou.';
+  if (select membership_status from public.profiles where id = '55555555-5555-5555-5555-555555555555') <> 'expulso' then
+    raise exception 'Expulsão não marcou expulso.';
   end if;
   if (select count(*) from public.characters where id = 'e6e6e6e6-e6e6-e6e6-e6e6-e6e6e6e6e6e6') <> 1 then
     raise exception 'Expulsão apagou a ficha.';
+  end if;
+  if not exists (
+    select 1 from public.audit_log
+    where action = 'EXPULSAR'
+      and actor_id = '11111111-1111-1111-1111-111111111111'
+      and target_id = '55555555-5555-5555-5555-555555555555'
+  ) then
+    raise exception 'Auditoria sem a expulsão.';
+  end if;
+end $$;
+
+do $$
+begin
+  perform set_config('request.jwt.claim.sub', '55555555-5555-5555-5555-555555555555', false);
+  update public.characters set narrative_notes = 'invasao' where id = 'e6e6e6e6-e6e6-e6e6-e6e6-e6e6e6e6e6e6';
+  raise exception 'expulso editou a ficha';
+exception when others then
+  if sqlerrm = 'expulso editou a ficha' then raise; end if;
+  if sqlerrm <> 'Você foi expulso da mesa.' then
+    raise exception 'ficha do expulso: %', sqlerrm;
+  end if;
+end $$;
+
+do $$
+declare
+  v_code text;
+begin
+  select invite_code into v_code from public.table_secrets where id = 1;
+  perform set_config('request.jwt.claim.sub', '55555555-5555-5555-5555-555555555555', false);
+  perform public.entrar_com_convite(v_code);
+  raise exception 'expulso usou convite';
+exception when others then
+  if sqlerrm = 'expulso usou convite' then raise; end if;
+  if sqlerrm <> 'A readmissão é decisão do mestre principal.' then
+    raise exception 'convite do expulso: %', sqlerrm;
+  end if;
+end $$;
+
+do $$
+declare
+  v_code text;
+begin
+  select invite_code into v_code from public.table_secrets where id = 1;
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
+  perform public.entrar_com_convite(v_code);
+  raise exception 'mestre entrou como jogador';
+exception when others then
+  if sqlerrm = 'mestre entrou como jogador' then raise; end if;
+  if sqlerrm <> 'O mestre não tem entrada de jogador na própria mesa.' then
+    raise exception 'convite do mestre: %', sqlerrm;
   end if;
 end $$;
 
 do $$
 begin
   perform set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', false);
+  perform public.readmitir_jogador('55555555-5555-5555-5555-555555555555');
+  raise exception 'co-mestre readmitiu';
+exception when others then
+  if sqlerrm = 'co-mestre readmitiu' then raise; end if;
+  if sqlerrm <> 'Só o mestre principal pode fazer isso.' then
+    raise exception 'co-mestre readmitir: %', sqlerrm;
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
+select public.readmitir_jogador('55555555-5555-5555-5555-555555555555');
+
+do $$
+begin
+  if (select membership_status from public.profiles where id = '55555555-5555-5555-5555-555555555555') <> 'aprovado' then
+    raise exception 'Readmissão não aprovou.';
+  end if;
+  if (select narrative_notes from public.characters where id = 'e6e6e6e6-e6e6-e6e6-e6e6-e6e6e6e6e6e6') = 'invasao' then
+    raise exception 'A edição do expulso gravou.';
+  end if;
+  if not exists (
+    select 1 from public.audit_log
+    where action = 'READMITIR' and actor_id = '11111111-1111-1111-1111-111111111111'
+  ) then
+    raise exception 'Auditoria sem a readmissão.';
+  end if;
+end $$;
+
+do $$
+begin
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
   perform public.expulsar_jogador('11111111-1111-1111-1111-111111111111');
   raise exception 'expulsou principal';
 exception when others then
   if sqlerrm = 'expulsou principal' then raise; end if;
-  if sqlerrm <> 'Co-mestre e mestre principal não saem por aqui.' then
+  if sqlerrm <> 'O mestre principal não sai por aqui.' then
     raise exception 'expulsar principal: %', sqlerrm;
   end if;
 end $$;
@@ -348,6 +453,18 @@ begin
   end if;
 end $$;
 
+do $$
+begin
+  perform set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', false);
+  perform public.reiniciar_campanha('REINICIAR');
+  raise exception 'co-mestre reiniciou cedo';
+exception when others then
+  if sqlerrm = 'co-mestre reiniciou cedo' then raise; end if;
+  if sqlerrm <> 'Só o mestre principal pode fazer isso.' then
+    raise exception 'reset ainda co-mestre: %', sqlerrm;
+  end if;
+end $$;
+
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
 select public.remover_co_mestre('44444444-4444-4444-4444-444444444444');
 
@@ -363,3 +480,110 @@ begin
     raise exception 'A mesa não permaneceu ativa.';
   end if;
 end $$;
+
+do $$
+begin
+  perform set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', false);
+  perform public.reiniciar_campanha('REINICIAR');
+  raise exception 'co-mestre reiniciou';
+exception when others then
+  if sqlerrm = 'co-mestre reiniciou' then raise; end if;
+  if sqlerrm <> 'Só o mestre principal pode fazer isso.' then
+    raise exception 'reset co-mestre: %', sqlerrm;
+  end if;
+end $$;
+
+do $$
+declare
+  antes int;
+begin
+  select count(*) into antes from public.characters;
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', false);
+  perform public.reiniciar_campanha('REINICIAR');
+  raise exception 'jogador reiniciou';
+exception when others then
+  if sqlerrm = 'jogador reiniciou' then raise; end if;
+  if sqlerrm <> 'Só o mestre principal pode fazer isso.' then
+    raise exception 'reset jogador: %', sqlerrm;
+  end if;
+  if (select count(*) from public.characters) <> antes then
+    raise exception 'Reset de quem não é mestre apagou ficha.';
+  end if;
+end $$;
+
+begin;
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
+select public.expulsar_jogador('33333333-3333-3333-3333-333333333333');
+
+do $$
+declare
+  v_marcas int;
+  v_oficiais int;
+  v_npc int;
+  v_condicoes int;
+  antes int;
+begin
+  select count(*) into antes from public.characters;
+  select count(*) into v_marcas from public.marks;
+  select count(*) into v_oficiais from public.abilities where mark_id is not null;
+  select count(*) into v_npc from public.abilities where mark_id is null;
+  select count(*) into v_condicoes from public.conditions;
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  begin
+    perform public.reiniciar_campanha('quase');
+    raise exception 'confirmacao fraca';
+  exception when others then
+    if sqlerrm = 'confirmacao fraca' then raise; end if;
+    if sqlerrm <> 'Digite REINICIAR para confirmar.' then
+      raise exception 'confirmacao: %', sqlerrm;
+    end if;
+  end;
+  if (select count(*) from public.characters) <> antes then
+    raise exception 'Confirmação errada apagou ficha.';
+  end if;
+
+  perform public.reiniciar_campanha('Oeste Maldito');
+  if (select count(*) from public.characters) <> 0 then
+    raise exception 'Reset deixou ficha.';
+  end if;
+  if (select count(*) from public.item_definitions) <> 0 then
+    raise exception 'Reset deixou item.';
+  end if;
+  if (select count(*) from public.marks) <> v_marcas then
+    raise exception 'Reset apagou Marcas.';
+  end if;
+  if (select count(*) from public.abilities where mark_id is not null) <> v_oficiais then
+    raise exception 'Reset apagou habilidades de Marca.';
+  end if;
+  if (select count(*) from public.abilities where mark_id is null) <> v_npc then
+    raise exception 'Reset apagou habilidade de NPC.';
+  end if;
+  if (select count(*) from public.conditions) <> v_condicoes then
+    raise exception 'Reset apagou condições cadastradas.';
+  end if;
+  if (select role from public.profiles where id = '11111111-1111-1111-1111-111111111111') <> 'master'
+     or (select membership_status from public.profiles where id = '11111111-1111-1111-1111-111111111111') <> 'aprovado' then
+    raise exception 'Reset mexeu no mestre principal.';
+  end if;
+  if (select membership_status from public.profiles where id = '22222222-2222-2222-2222-222222222222') <> 'pendente' then
+    raise exception 'Jogador aprovado não voltou a pendente.';
+  end if;
+  if (select membership_status from public.profiles where id = '33333333-3333-3333-3333-333333333333') <> 'expulso' then
+    raise exception 'Reset readmitiu quem estava expulso.';
+  end if;
+  if (select name from public.adventure where id = 1) <> 'Oeste Maldito' then
+    raise exception 'Reset apagou o nome da campanha.';
+  end if;
+  if (select status from public.adventure where id = 1) <> 'ativa' then
+    raise exception 'Campanha não ficou ativa.';
+  end if;
+  if (select count(*) from public.table_secrets) <> 1 then
+    raise exception 'Reset apagou o convite.';
+  end if;
+  if (select count(*) from public.audit_log) <> 1
+     or (select action from public.audit_log) <> 'REINICIAR'
+     or (select actor_id from public.audit_log) <> '11111111-1111-1111-1111-111111111111' then
+    raise exception 'Auditoria não ficou só com o reset.';
+  end if;
+end $$;
+rollback;
