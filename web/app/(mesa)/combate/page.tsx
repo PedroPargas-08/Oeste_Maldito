@@ -8,9 +8,10 @@ import {
   moverOrdem,
 } from "@/lib/actions/combate"
 import { carregarEnergia, usarConsumivel } from "@/lib/actions/ficha"
-import { CartaHabilidade } from "@/components/habilidade-carta"
+import { CartaHabilidade, FormaAlvosArea } from "@/components/habilidade-carta"
 import { Dados } from "@/components/dados"
 import { Aviso, Enviar } from "@/components/ui"
+import { montarUsosArea } from "@/lib/marks"
 import { exigirMesa, quando, relacao } from "@/lib/mesa"
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ erro?: string }> }) {
@@ -44,7 +45,33 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
     ? (await mesa.supabase.from("inventory").select("id, quantity, item_definitions!inner(name, category)").eq("character_id", eu.id).eq("item_definitions.category", "consumivel")).data
     : []
   const meuTurno = Boolean(eu && combate?.active_character_id === eu.id)
-  const alvos = (combatentes ?? []).map((item) => ({ id: item.character_id as string, name: item.display_name as string }))
+  const { data: alvosRpc } = eu
+    ? await mesa.supabase.rpc("alvos_de_habilidade", { p_character_id: eu.id })
+    : { data: [] }
+  const alvos = (alvosRpc ?? []).map((item: { id: string; name: string }) => ({ id: item.id, name: item.name || "Sem nome" }))
+  const { data: efeitos } = mesa.isMaster
+    ? await mesa.supabase.from("ability_effects").select("id, summary, turns_left").is("ended_at", null)
+    : { data: [] }
+  const { data: usosBrutos } = mesa.isMaster
+    ? await mesa.supabase.from("ability_uses").select("id, note, abilities(name, target_count, max_targets)").order("created_at", { ascending: false }).limit(8)
+    : { data: [] }
+  const idsDeUso = (usosBrutos ?? []).map((uso) => uso.id as string)
+  const { data: alvosRegistrados } = mesa.isMaster && idsDeUso.length
+    ? await mesa.supabase.from("ability_use_targets").select("ability_use_id").in("ability_use_id", idsDeUso)
+    : { data: [] }
+  const usosArea = montarUsosArea(
+    (usosBrutos ?? []).map((uso) => {
+      const habilidade = relacao(uso.abilities) as { name?: string; target_count?: string; max_targets?: number | null } | null
+      return {
+        id: uso.id as string,
+        note: uso.note as string,
+        name: habilidade?.name || "Habilidade",
+        targetCount: habilidade?.target_count,
+        maxTargets: habilidade?.max_targets,
+      }
+    }),
+    alvosRegistrados ?? [],
+  )
 
   const armas = (armasBrutas ?? []).map((item) => ({
     id: item.id as string,
@@ -88,6 +115,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
               ))}
             </tbody>
           </table>
+          {(efeitos ?? []).length ? (
+            <ul>{(efeitos ?? []).map((item) => <li key={item.id}>{item.summary} · {item.turns_left ?? "—"} turno(s)</li>)}</ul>
+          ) : null}
           {mesa.isMaster ? (
             <div className="row">
               <form action={avancarTurno}><input type="hidden" name="combat_id" value={combate.id} /><button className="btn solid" type="submit">Próximo turno</button></form>
@@ -117,6 +147,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
           ) : null}
         </section>
       ) : null}
+      {mesa.isMaster ? <FormaAlvosArea usos={usosArea} fichas={(fichas ?? []).map((item) => ({ id: item.id, name: item.name || "Sem nome" }))} destino="/combate" /> : null}
       {mesa.isMaster ? <Dados personagens={(fichas ?? []).map((item) => ({ id: item.id, name: item.name || "Sem nome" }))} armas={armas} /> : null}
       <section className="panel">
         <h2>Rolagens</h2>

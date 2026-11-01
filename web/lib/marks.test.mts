@@ -2,7 +2,10 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { describe, it } from "node:test"
 import { HABILIDADES_DE_MARCA, MARCAS } from "./marks-catalog.ts"
-import { alcancePermitido, curaLimitada, custoEspirito, danoRecurso, vidaTemporaria } from "./marks.ts"
+import { absorcaoPermitida, alcancePermitido, alvoAutorizado, avisosDeHabilidade, curaLimitada, custoEspirito, danoRecurso, fichaRestaurada, limiteDeAlvosEscrito, montarUsosArea, relogioDoEfeito, vagasDeAlvo, vidaTemporaria } from "./marks.ts"
+
+const correcoes = readFileSync(new URL("../supabase/migrations/20261031223000_marcas_correcoes.sql", import.meta.url), "utf8")
+const limiteAlvos = readFileSync(new URL("../supabase/migrations/20261031233000_limite_alvos.sql", import.meta.url), "utf8")
 
 const migracao = readFileSync(new URL("../supabase/migrations/20261031180000_marcas.sql", import.meta.url), "utf8")
 const catalogoSql = migracao.split("-- Catálogo inicial")[1] ?? ""
@@ -91,5 +94,106 @@ describe("proteção da migração", () => {
     assert.match(migracao, /A Marca só é atribuída pelo mestre/)
     assert.match(migracao, /Habilidade passiva não é ativada/)
     assert.match(migracao, /Habilidades de Marca acompanham a Marca/)
+  })
+})
+
+describe("correções de autorização e essência", () => {
+  it("autoriza NPC e a própria ficha, e recusa outro jogador", () => {
+    assert.deepEqual(alvoAutorizado({ mestre: false, usuarioId: "a", alvo: { playerId: null } }), { ok: true })
+    assert.deepEqual(alvoAutorizado({ mestre: false, usuarioId: "a", alvo: { playerId: "a" } }), { ok: true })
+    assert.equal(alvoAutorizado({ mestre: false, usuarioId: "a", alvo: { playerId: "b" } }).ok, false)
+    assert.equal(alvoAutorizado({ mestre: true, usuarioId: "a", alvo: { playerId: "b" } }).ok, true)
+    assert.equal(alvoAutorizado({ mestre: false, usuarioId: "a", alvo: null }).ok, false)
+    assert.match(correcoes, /Um jogador não altera a ficha de outro jogador/)
+  })
+
+  it("impede absorver de novo a mesma criatura e não inventa o consumo", () => {
+    assert.equal(absorcaoPermitida({ mestre: false, mesmaFicha: false, pv: 0, npc: true, jaAbsorvida: false }).ok, true)
+    assert.equal(absorcaoPermitida({ mestre: false, mesmaFicha: false, pv: 0, npc: true, jaAbsorvida: true }).ok, false)
+    assert.equal(absorcaoPermitida({ mestre: false, mesmaFicha: false, pv: 12, npc: true, jaAbsorvida: false }).ok, false)
+    assert.equal(absorcaoPermitida({ mestre: false, mesmaFicha: false, pv: 0, npc: false, jaAbsorvida: false }).ok, false)
+    assert.equal(absorcaoPermitida({ mestre: true, mesmaFicha: false, pv: 0, npc: false, jaAbsorvida: false }).ok, true)
+    assert.match(correcoes, /essence_absorptions_source_key unique \(source_character_id\)/)
+    assert.match(correcoes, /quantidade ainda não está definida/)
+    assert.doesNotMatch(correcoes, /essence_stored = essence_stored -/)
+  })
+
+  it("desconta a duração no turno de quem recebeu o efeito", () => {
+    assert.equal(relogioDoEfeito("um", "caster", "alvo"), "alvo")
+    assert.equal(relogioDoEfeito("proprio", "caster", null), "caster")
+    assert.equal(relogioDoEfeito("varios", "caster", "alvo"), "caster")
+    assert.match(correcoes, /clock_character_id = p_character_id/)
+  })
+
+  it("aceita ficha antiga sem Marca, Vida temporária ou essência", () => {
+    assert.deepEqual(fichaRestaurada({}), { pv_temporary: 0, essence_stored: 0, mark_id: null })
+    assert.equal(fichaRestaurada({ pv_temporary: 40, essence_stored: 2, mark_id: "devoracao" }).essence_stored, 2)
+    assert.match(correcoes, /coalesce\(r\.pv_temporary, 0\)/)
+    assert.match(correcoes, /coalesce\(r\.essence_stored, 0\)/)
+    assert.doesNotMatch(correcoes, /update public\.characters set mark_id/)
+  })
+
+  it("não apresenta passiva numérica como cálculo automático", () => {
+    const couro = avisosDeHabilidade({ kind: "passiva", slug: "couro-de-ferro", target_count: "nenhum" })
+    assert.match(couro[0], /Não altera PV/)
+    const erupcao = avisosDeHabilidade({ kind: "combate", slug: "erupcao-necrotica", target_count: "varios", requires_essence: true, damage_pv: 200 })
+    assert.match(erupcao.join(" "), /ninguém recebe dano automático/)
+    assert.match(erupcao.join(" "), /carga não é gasta/)
+    assert.match(erupcao.join(" "), /quantidade máxima de alvos não está definida/)
+  })
+})
+
+describe("limite de alvos", () => {
+  it("só numera o que o texto da habilidade já define", () => {
+    const limites = new Map<string, number>()
+    for (const item of HABILIDADES_DE_MARCA) {
+      const limite = limiteDeAlvosEscrito(item)
+      if (limite != null) limites.set(item.slug, limite)
+    }
+    assert.deepEqual(Object.fromEntries(limites), {
+      "ricochete-guiado": 3,
+      "saque-relampago-fantasma": 2,
+      "duelo-de-fantoches": 2,
+    })
+    assert.equal(HABILIDADES_DE_MARCA.filter((item) => limiteDeAlvosEscrito(item) == null).length, 32)
+  })
+
+  it("grava esses tetos no banco e deixa o restante sem quantidade", () => {
+    for (const [slug, limite] of [
+      ["ricochete-guiado", 3],
+      ["saque-relampago-fantasma", 2],
+      ["duelo-de-fantoches", 2],
+    ] as const) {
+      assert.match(limiteAlvos, new RegExp(`set max_targets = ${limite}\\s+where slug = '${slug}'`))
+    }
+    for (const slug of ["chuva-de-chumbo-espectral", "investida-brutal", "grito-de-panico", "campo-de-desorientacao", "expulsa-de-morte", "erupcao-necrotica"]) {
+      assert.equal(limiteDeAlvosEscrito(HABILIDADES_DE_MARCA.find((item) => item.slug === slug)!), null)
+      assert.doesNotMatch(limiteAlvos, new RegExp(`slug = '${slug}'`))
+    }
+    assert.match(limiteAlvos, /v_novos > 0 and v_ja \+ v_novos > v_ab\.max_targets/)
+    assert.match(limiteAlvos, /Essa habilidade aceita no máximo/)
+  })
+
+  it("mostra o teto conhecido e preserva vaga quando a regra não define", () => {
+    const ricochete = avisosDeHabilidade({ kind: "ativavel", slug: "ricochete-guiado", target_count: "varios", max_targets: 3 })
+    assert.match(ricochete.join(" "), /No máximo 3 alvos/)
+    const chuva = avisosDeHabilidade({ kind: "combate", slug: "chuva-de-chumbo-espectral", target_count: "varios", max_targets: null })
+    assert.match(chuva.join(" "), /quantidade máxima de alvos não está definida/)
+    assert.equal(vagasDeAlvo(1, 3), 2)
+    assert.equal(vagasDeAlvo(3, 3), 0)
+    assert.equal(vagasDeAlvo(4, 3), 0)
+    assert.equal(vagasDeAlvo(9, null), null)
+    const usos = montarUsosArea(
+      [
+        { id: "a", note: "nota", name: "Ricochete Guiado", targetCount: "varios", maxTargets: 3 },
+        { id: "b", note: "nota", name: "Chuva", targetCount: "varios", maxTargets: null },
+        { id: "c", note: "nota", name: "Toque", targetCount: "um", maxTargets: null },
+      ],
+      [{ ability_use_id: "a" }, { ability_use_id: "a" }],
+    )
+    assert.equal(usos.length, 2)
+    assert.equal(usos[0]?.registrados, 2)
+    assert.equal(usos[0]?.maxTargets, 3)
+    assert.equal(usos[1]?.maxTargets, null)
   })
 })

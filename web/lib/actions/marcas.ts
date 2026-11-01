@@ -8,9 +8,22 @@ function destinoDe(formData: FormData, padrao: string) {
   return String(formData.get("destino") ?? padrao)
 }
 
+function modoAlvo(valor: FormDataEntryValue | null) {
+  const modo = String(valor ?? "um")
+  if (modo === "nenhum" || modo === "proprio" || modo === "um" || modo === "varios") return modo
+  return "um"
+}
+
 function inteiroOpcional(valor: FormDataEntryValue | null) {
   const texto = String(valor ?? "").trim()
   if (!texto) return null
+  return Number(texto)
+}
+
+function maximoAlvos(valor: FormDataEntryValue | null) {
+  const texto = String(valor ?? "").trim()
+  if (!texto) return null
+  if (!/^\d+$/.test(texto) || Number(texto) < 1) return Number.NaN
   return Number(texto)
 }
 
@@ -45,9 +58,26 @@ export async function usarHabilidade(formData: FormData) {
 export async function registrarAbsorcao(formData: FormData) {
   const mesa = await exigirMesa()
   const destino = destinoDe(formData, "/ficha")
+  const origem = String(formData.get("source_id") ?? "").trim()
+  if (!origem) falhar(destino, "Informe a criatura absorvida.")
   const { error } = await mesa.supabase.rpc("registrar_absorcao", {
     p_character_id: String(formData.get("character_id") ?? ""),
     p_choice: String(formData.get("choice") ?? ""),
+    p_source_id: origem,
+  })
+  if (error) falhar(destino, textoErro(error)!)
+  concluir(destino)
+}
+
+export async function registrarAlvos(formData: FormData) {
+  const mesa = await exigirMesa()
+  const destino = destinoDe(formData, "/ficha")
+  if (!mesa.isMaster) falhar(destino, "Somente o mestre registra os alvos.")
+  const alvos = formData.getAll("target_id").map((item) => String(item)).filter(Boolean)
+  if (!alvos.length) falhar(destino, "Informe ao menos um alvo.")
+  const { error } = await mesa.supabase.rpc("registrar_alvos_habilidade", {
+    p_use_id: String(formData.get("use_id") ?? ""),
+    p_target_ids: alvos,
   })
   if (error) falhar(destino, textoErro(error)!)
   concluir(destino)
@@ -73,6 +103,8 @@ export async function editarHabilidade(formData: FormData) {
   const mesa = await exigirMesa()
   const destino = destinoDe(formData, "/marcas")
   if (!mesa.isMaster) falhar(destino, "Somente o mestre edita habilidades.")
+  const maximo = maximoAlvos(formData.get("max_targets"))
+  if (Number.isNaN(maximo)) falhar(destino, "O máximo de alvos, quando existe, é um inteiro a partir de 1.")
   const { error } = await mesa.supabase
     .from("abilities")
     .update({
@@ -81,6 +113,8 @@ export async function editarHabilidade(formData: FormData) {
       requirements_text: String(formData.get("requirements_text") ?? ""),
       limitations: String(formData.get("limitations") ?? ""),
       spirit_cost: Number(formData.get("spirit_cost") ?? 0),
+      target_count: modoAlvo(formData.get("target_count")),
+      max_targets: maximo,
       target_text: String(formData.get("target_text") ?? ""),
       area_text: String(formData.get("area_text") ?? ""),
       range_label: String(formData.get("range_label") ?? ""),
